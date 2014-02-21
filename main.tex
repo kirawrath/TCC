@@ -8,6 +8,8 @@
 
 
 \usepackage{multirow}
+\usepackage{url}
+%\usepackage{hyperref}
 %----------------------------------------------------------------------
 % Comandos criados pelo usuário
 \newcommand{\afazer}[1]{{\color{red}{#1}}} % Para destacar uma parte a ser trabalhada
@@ -192,11 +194,10 @@ Em sistemas orientados a aplicação, famílias de abstrações são frequentemente tr
 Interface inflada basicamente é uma interface que declara os métodos de todas as classes que derivam dela, exportanto assim todos os métodos daquela família de abstrações. Deste modo, o desenvolvedor de aplicativo poderia escrever a aplicação inteira em termos da interface inflada, relegando a tarefa de configuração do sistema a um utilitário automatizado. Tal utilitário poderia, através de uma análise sintática do código fonte, escolher quais os membros mais leves da família exportanda serão associados no momento da compilação\cite[p.~56]{guto_thesis}.
 
 %write about specifics from timers
-\begin{figure}[h!]
+\begin{figure}[ht!]
     \centering
     \includegraphics[width=7.5cm]{figuras/inflated_interface}
     \caption{Exemplos de uso de interfaces infladas\cite{guto_thesis}.}
-    %\label{zedboard}
 \end{figure}
 
 
@@ -221,7 +222,7 @@ Há disponível 512mb de RAM DDR3, e um SD card de 4GB. A Zedboard suporta conexão
 
 
 
-\begin{figure}[h!]
+\begin{figure}[ht!]
     \centering
     \includegraphics[width=8cm]{figuras/zedboard}
     \caption{Zedboard visto de cima.}
@@ -305,7 +306,7 @@ Para gerar um \emph{Supervisor Call}, usa-se a instrução \verb+svc+. O processad
 \textbf{Modo Monitor:} Modo que o processador entra quando recebe uma interrupção \emph{Secure Monitor Call}, \verb+SMC+. Este modo está fora do escopo do trabalho.
 
 
-\begin{figure}[h!]
+\begin{figure}[ht!]
     \centering
     \includegraphics[width=12cm]{figuras/banked_registers}
     \caption{Banked registers.}
@@ -325,9 +326,9 @@ Cada CPU está conectada a um conjunto privado de 5 interrupções de periféricos, 
 \textbf{Interrupções de Periféricos Compartilhados: }
 Existem cerca de 60 interrupções de diversos modulos que podem ser roteadas para um ou ambos processadores, ou para a lógica programável. O GIC é responsável por administrar estas interrupções.
 
-\begin{figure}[h!]
+\begin{figure}[ht!]
     \centering
-    \includegraphics[width=16cm]{figuras/zynq-7000}
+    \includegraphics[width=15cm]{figuras/zynq-7000}
     \caption{Arquitetura do Zynq 7000.}
 \end{figure}
 
@@ -344,7 +345,7 @@ No nível de sistema (\emph{sistem-level (PL)}), há dois cronômetros triplos, cuj
 
 \cite[p.~622]{ug585}
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \begin{tabular}{ccc}
 \hline\hline
@@ -364,7 +365,7 @@ CPU\_1x   &                        & 133 MHZ\\[1ex]
 \caption{Máximas frequências possíveis para cada configuração de \emph{clock}. Para uma lista mais completa (com as diferentes graduações de \emph{clock}), veja \cite[p.~13]{data_sheet}.}
 \end{table}
 
-\begin{figure}[h!]
+\begin{figure}[ht!]
     \centering
     \includegraphics[width=8cm]{figuras/zedboard}
     \caption{Diagrama de blocos dos \emph{clocks} disponíveis no Zynq.}
