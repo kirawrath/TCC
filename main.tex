@@ -1,0 +1,430 @@
+\documentclass{ufscThesis/ufscThesis} % Definicao do documentclass ufscThesis	
+
+%----------------------------------------------------------------------
+% Pacotes usados especificamente neste documento
+\usepackage{graphicx} % Possibilita o uso de figuras e gráficos
+\usepackage{color}    % Possibilita o uso de cores no documento
+\usepackage{listings}
+
+
+\usepackage{multirow}
+%----------------------------------------------------------------------
+% Comandos criados pelo usuário
+\newcommand{\afazer}[1]{{\color{red}{#1}}} % Para destacar uma parte a ser trabalhada
+
+%----------------------------------------------------------------------
+% Identificadores do trabalho
+% Usados para preencher os elementos pré-textuais
+\instituicao[a]{Universidade Federal de Santa Catarina} % Opcional
+\departamento[a]{INE}
+\curso[o]{Programa de ...}
+\documento[a]{Tese} % [o] para dissertação [a] para tese
+\titulo{Portando o EPOS para a Zedboard}
+%\subtitulo{Subtítulo (se houver)} % Opcional
+\autor{Bruno Farias de Loreto}
+\grau{...}
+\local{Florianópolis} % Opcional (Florianópolis é o padrão)
+\data{04}{Março}{2014}
+\orientador[Orientador\\Universidade Federal de Santa Catarina]{Prof. Dr. Antônio Augusto Fröhlich}
+\coorientador[Coorientador\\Universidade ...]{Prof. Dr.}
+\coordenador[Coordenador\\Universidade ...]{Prof. Dr. }
+
+\numerodemembrosnabanca{4} % Isso decide se haverá uma folha adicional
+\orientadornabanca{sim} % Se faz parte da banca definir como sim
+\coorientadornabanca{sim} % Se faz parte da banca definir como sim
+\bancaMembroA{Primeiro membro\\Universidade ...} %Nome do presidente da banca
+\bancaMembroB{Segundo membro\\Universidade ...}      % Nome do membro da Banca
+\bancaMembroC{Terceiro membro\\Universidade ...}     % Nome do membro da Banca
+\bancaMembroD{Quarto membro\\Universidade ...}       % Nome do membro da Banca
+%\bancaMembroE{Quinto membro\\Universidade ...}       % Nome do membro da Banca
+
+%\dedicatoria{Este trabalho é dedicado a ...}
+
+%\agradecimento{Inserir os agradecimentos aos colaboradores à execução do trabalho.}
+
+%\epigrafe{Texto da Epígrafe. Citação relativa ao tema do trabalho. É opcional. A epígrafe pode também aparecer na abertura de cada seção ou capítulo.}
+%{(Autor da epígrafe, ano)}
+
+\textoResumo {
+Sistemas embarcados crescem em poder de processamento conforme o mercado faz suas demandas. Com a difusão de aparelhos mais potentes (no âmbito de sistemas embarcados) como smartphones e tablets, processadores RISC alcançaram clocks da ordem de gigahertz, bem como mais \emph{cores}. Processadores multicores possibilitam linhas de pesquisa que precisam de paralelismo real para serem validadas, como por exemplo o estudo do subsistema de memória compartilhada do EPOS em um RISC. Este trabalho visa descrever e documentar como o sistema operacional EPOS foi portado para uma plataforma \emph{multicore}.
+}
+\palavrasChave {Systemas Operacionais. Portabilidade. EPOS.}
+ 
+\textAbstract {
+}
+\keywords {Operating Systems. Porting. EPOS.}
+
+%----------------------------------------------------------------------
+% Início do documento                                
+%\begin{document}
+%\section{EXPOSIÇÃO DO TEMA OU MATÉRIA}
+%\subsection{Exemplo de como gerar a lista de símbolos e abreviaturas}
+%
+%Para gerar a lista de símbolos e abreviaturas use os comandos
+%
+%\abreviatura{ABNT}{Associação Brasileira de Normas Técnicas}
+%\abreviatura{IBGE}{Instituto Brasileiro de Geografia e Estatística}
+%\simbolo{$\int$}{Integral}
+%\simbolo{$\prod$}{Produtório}
+%
+%\begin{lstlisting}
+%\simbolo{símbolo}{descrição}
+%\end{lstlisting}
+%
+%\begin{lstlisting}
+%\abreviatura{abreviatura}{descrição}
+%\end{lstlisting}
+%
+%\subsubsection{Exemplo de citações no \LaTeX}
+%
+%Segundo \citeonline{alves_2001} ...
+%
+%...no final da frase \cite{abnt14724,BU_formatoA5}
+%--------------------------------------------------------
+
+\abreviatura{TCM}{\emph{Tightly Coupled Memory}}
+\abreviatura{MMU}{\emph{Memory Management Unit}}
+\abreviatura{SP}{\emph{Stack Pointer}}
+\abreviatura{PC}{\emph{Program Counter}}
+\abreviatura{LR}{\emph{Link Register}}
+\abreviatura{CPSR}{\emph{Current Program Status Register (The register that holds the current operating processor status).}}
+\abreviatura{SPSR}{\emph{Saved Program Status Register (The register that holds the CPSR of the taskimmediately before the exception occurred that caused the switch to the current mode,so that it can be restored after handling the exception).}}
+\abreviatura{CP15}{\emph{System Control Coprocessor}}
+\abreviatura{IRQ}{\emph{ }}
+\abreviatura{FIQ}{\emph{Fast Interrupt}}
+\abreviatura{SCR}{\emph{ }}
+\abreviatura{APSR}{\emph{The Application Program Status Register (APSR) holds copies of the Arithmetic Logic Unit (ALU) status flags. They are also known as the condition code flags. They are used to determine whether conditional instructions are executed or not.}}
+\abreviatura{GIC}{\emph{Generic Interrupt Controler}}
+\abreviatura{rx}{Quando a abreviação rx aparecer, ela estará se referindo genericamente à qualquer um dos 13 primeiros registradores de propósito geral do ARM9 [r0-r12].}
+\abreviatura{PPI}{\emph{Private Peripheral Interrupt.}}
+\abreviatura{SGI}{\emph{Software Generated Interrupt.}}
+\abreviatura{SPI}{\emph{Shared Peripheral Interrupt.}}
+\abreviatura{PS}{\emph{Processing system.}}
+\abreviatura{PL}{\emph{Programmable Logic.}}
+\abreviatura{SMC}{\emph{Static Memory Controller}}
+\abreviatura{TSC}{\emph{Time Stamp Counter.}}
+
+
+
+\begin{document}
+
+%\capa  
+\folhaderosto[comficha] % Se nao quiser imprimir a ficha, é só não usar o parâmetro
+\folhaaprovacao
+\paginadedicatoria
+\paginaagradecimento
+\paginaepigrafe
+\paginaresumo
+\paginaabstract
+%\pretextuais % Substitui todos os elementos pre-textuais acima
+\listadefiguras % as listas dependem da necessidade do usuário
+\listadetabelas 
+\listadeabreviaturas
+\listadesimbolos
+\sumario
+%--------------------------------------------------------
+% Elementos textuais
+
+\chapter{Introdução}
+
+O presente trabalho visa descrever como foi feito o port do sistema operacional EPOS para a plataforma Zedboard, bem como comentar sobre as decisões tomadas e problemas enfrentados.
+
+\section{Motivação}
+EPOS é um sistema operacional que visa reduzir o custo de produção das aplicações embarcadas provendo um ambiente onde a aplicação do desenvolvedor possa rodar sem que ele tenha que lidar com configurações de baixo nível. Sendo assim é importante que o EPOS seja portado para um grande número de plataformas, do contrário o mesmo não teria utilidade prática.
+
+Zedboard é uma plataforma que usa o SoC Xilinx 7000, que por sua vez possui o processador \emph{dualcore} ARM Cortex A9. Existe uma dupla motivação para se fazer o port para esta plataforma: Primeiro que o EPOS ainda não foi portado para um processador RISC \emph{multicore}, e acredita-se que este port poderá possibilitar linhas de pesquisa com o EPOS que antes só poderiam ser feitos num CISC, algo que não é o ideal considerando-se o nicho de aplicação do EPOS. O segundo fator está relacionado com o próprio Zedboard. Dentro do LISHA (Laboratório de Integração Software-Hardware) há uma linha de pesquisa sobre Smart Homes (ou Smart Buildings) em cujo contexto se pretende usar um Zedboard. Mais detalhes sobre Smart Homes estão presentes nas próximas seções.
+
+\section{Objetivos Gerais}
+
+O objetivo deste trabalho é portar o sistema operacional EPOS e documentar este processo no presente documento. O port consiste em adaptar os componentes que, dentro da arquitetura do EPOS, são chamados de mediadores de hardware. Cada mediador precisa ser refeito para cada plataforma.
+Este trabalho terá certo direcionamento para as pessoas que no futuro precisem fazer um novo port do EPOS, de modo que elas não precisem passar pelos mesmos problemas e possam fazer isto mais eficientemente.
+
+\section{Objetivos Específicos}
+Dos objetivos específicos, pode-se organizá-los da forma:
+
+\begin{enumerate}
+    \item Estudo da arquitetura do EPOS, da arquitetura do ARM Cortex A9 e do Zedboard.
+    \item Ports
+    \begin{enumerate}
+        \item Timers
+        \item Controlador de Interrupção
+        \item MMU
+        \item CPU
+        \item Inicialização elf e Multicore
+    \end{enumerate}
+    \item Validações
+    \begin{enumerate}
+        \item Escalonadores em single e multicore
+        \item Threads
+        \item Thread Periódica
+        \item Alarmes
+        \item Cronometro
+        \item Sincronização
+    \end{enumerate}
+    \item Documentação
+\end{enumerate}
+
+\chapter{Conceitos Básicos}
+
+%source: http://epos.lisha.ufsc.br/EPOS+User+Guide
+\section{EPOS}
+
+EPOS (Embedded Parallel Operating System) é um sistema operacional orientado a aplicação, cujo design chama-se ADESD \emph{Application-Driven Embedded System Design Method}), proposto por Fröhlich. A ideia central do EPOS é prover um sistema operacional mínimo, de modo a minimizar o \emph{overhead} da existência de um sistema operacional, deixando o processador livre para executar a aplicação do desenvolvedor\cite{epos_user_guide}.
+
+Como o objetivo é criar um ambiente em que o desenvolvedor possa rapidamente produzir suas aplicações, EPOS provê vários utilitários comumente usados em aplicações, como filas, listas, tabelas de hashs, vetores, semáforos, OStream (para imprimir na tela), números aleatórios, cálculo de CRC e etc. Além destes utilitários, EPOS também provê uma série de componentes como threads, alarmes, cronometros, heaps e meios para acessar a rede (internet).
+
+\section{Arquitetura do EPOS}
+
+\textbf{Mediadores de Hardware:} Dentro da arquitetura do EPOS há o conceito de mediadores de hardware, que são os componentes (ou classes) dependentes de plataforma. Idealmente, as únicas classes que precisam ser modificadas e/ou reimplementadas são os mediadores. Há mediadores específicos da placa, como por exemplo Pandaboard, Zedboard e etc; abstraídos sob o nome de \emph{machine} e mediadores específicos de um processador, abstraídos sob o nome de \emph{architecture}. No código do EPOS, estes mediadores encontram-se nas pastas \emph{mach} e \emph{arch}.
+% Fonte: Hardware Mediators: A Portability Artifact for Component-based Systems
+% HAL vs Virtualização vs Mediadores
+
+Mediadores de hardware são uma nova alternativa ao tradicional uso de VMs\footnote{Virtual Machines.} e de HAL\footnote{Hardware Abstraction Layer}, proposta por Fröhlich em seu trabalho \emph{Application-Oriented System Design}\cite{guto_thesis}. O problema do uso de VMs é o seu \emph{overhead} causado devido à tradução das operações da VM em código nativo. Já o uso de um HAL incorre no problema da manutenibilidade e dificuldade de adapção à novas arquiteturas muito distintas entre si\cite{hw_mediators}. O HAL não conseguiu passar pela prova do tempo, e já está sendo considerado obsoleto por distribuições GNU/Linux populares, como o 
+Ubuntu\footnote{\url{http://www.linux-magazine.com/Online/News/Ubuntu-10.04-Alpha-2-Removes-HAL}}, sendo chamado de ``uma grande não-manutenível bagunça monolítica''\footnote{\url{https://wiki.ubuntu.com/Halsectomy}}.
+
+
+
+\textbf{Traits:} Traits é uma classe onde se é possível configurar certos componentes do EPOS em tempo de compilação. Lá é possível, por exemplo, de se definir o tamanho da stack e heap do sistema, a sua frequência de clock bem como ativar ou desativar certas funções do sistema. Esta classe normalmente precisa ser alterada em um port, mesmo ela não sendo um mediador de hardware.
+
+\textbf{Interface Infladas: } Um conceito importante da arquitetura do EPOS é a Interface Inflada. %http://www.inf.ufsc.br/~guto/publications/aoos.pdf
+Em sistemas orientados a aplicação, famílias de abstrações são frequentemente tratadas como entidades únicas, algo que pode ser vantajoso para o programador da aplicação, já que este não precisaria se preocupar com qual membro em específico desta família ele precisaria usar\cite{guto_thesis}.
+
+Interface inflada basicamente é uma interface que declara os métodos de todas as classes que derivam dela, exportanto assim todos os métodos daquela família de abstrações. Deste modo, o desenvolvedor de aplicativo poderia escrever a aplicação inteira em termos da interface inflada, relegando a tarefa de configuração do sistema a um utilitário automatizado. Tal utilitário poderia, através de uma análise sintática do código fonte, escolher quais os membros mais leves da família exportanda serão associados no momento da compilação\cite[p.~56]{guto_thesis}.
+
+%write about specifics from timers
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=7.5cm]{figuras/inflated_interface}
+    \caption{Exemplos de uso de interfaces infladas\cite{guto_thesis}.}
+    %\label{zedboard}
+\end{figure}
+
+
+\section{Hardware-alvo}
+%source: http://www.zedboard.org/product/zedboard
+Zedboard é uma plataforma de desenvolvimento que suporta uma grande variedade de aplicações, visto que ela possui uma boa gama de interfaces e funções para habilitar isto. É uma dedicada à prototipação e \emph{proof-of-concept}. Em seu interior ela possui um Xilinx Zynq 7000 (Z-7020), que é a arquitetura alvo deste port\cite{zedboard}.
+
+O ZYNQ¿-7000 SOC XC7Z020-CLG484-1 conta com o processador Dual ARM® Cortex¿-A9 MPCore¿. O Zynq possui 4 graduações de velocidade de \emph{clock}, a comercial (graduação -1), industrial (graduação -1 a -2), estendida (-2 a -3) e expandida (-1), sendo a graduação -1 a menor velocidade, e a -3 a maior\cite{product_table}.
+
+De acordo com a específicação da Zedboard\cite{zedboard}, o \emph{clock} máximo do processador é de 667MHZ, portanto, tendo como referência a tabela de dados do Zynq-7000\cite[p.~13]{data_sheet}, chegamos à conclusão que a graduação de velocidade do Zynq usado na Zedboard é de -1 (comercial), esta informação se tornará útil mais à frente.
+
+Há disponível 512mb de RAM DDR3, e um SD card de 4GB. A Zedboard suporta conexão com JTAG, saída serial (usb UART) e conexão com a internet\cite{xilinx}.
+
+
+\cite[p.~26]{ug585}
+%The Zynq-7000 family offers the flexibility and scalability of an FPGA, while providing performance,
+%power, and ease of use typically associated with ASIC and ASSPs. The range of devices in the
+%Zynq-7000 AP SoC family enables designers to target cost-sensitive as well as high-performance
+%applications from a single platform using industry-standard tools. While each device in the
+%Zynq-7000 family contains the same PS, the PL and I/O resources vary between the devices. As a
+%result, the Zynq-7000 AP SoC devices are able to serve a wide range of applications including:
+
+
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=8cm]{figuras/zedboard}
+    \caption{Zedboard visto de cima.}
+\end{figure}
+
+\subsection{Arquitetura do Zynq 7000}
+Como já citado, o Zynq 7000 possui um processador dual core Cortex A9, cada core possui sua própria MMU e memória cache L1 (instruções e dados) privada.
+
+%layout de memoria
+\subsection{OCM} O \emph{On-chip Memory} é uma pequena memória de 256KB de RAM que fica próxima ao processador, e portanto tem um acesso mais rápido. O OCM pode ser mapeado nos primeiros 256KB do espaço de endereçamento, ou nos últimos 256KB do espaço de endereçamento\cite{ug585} (como mostrado na tabela \ref{tab.memlayout}).
+
+\subsection{Layout de memória} 
+A tabela abaixo é uma simplificação do layout de memória do Zynq\footnote{Uma tabela mais completa e detalhada pode ser encontrada em UG585 (v1.6.1), p. 115.}.
+
+\begin{table}[ht]
+
+\centering
+\begin{tabular}{ccp{5cm}}
+\hline\hline                        %inserts double horizontal lines
+Intervalo de endereço  & Região mapeada & Comentários\\ [0.5ex] % inserts table 
+%heading
+\hline                  % inserts single horizontal line
+\verb+0x0000_0000 - 0x0003_FFFF+ & OCM & \parbox{5cm}{OCM quando mapeada em \\memória baixa (padrão).} \\
+\verb+0x0010_0000 - 0x3FFF_FFFF+ & DDR &  \\
+\verb+0x4000_0000 - 0xFFFB_FFFF+ & Várias & \parbox{5cm}{Registradores mapeados em \\memória ou áreas reservadas.} \\
+\verb+0xFFFC_0000 - 0xFFFF_FFFF+ & OCM & \parbox{5cm}{OCM quando mapeada em \\memória alta.}\\ [1ex]
+\hline %inserts single line
+\end{tabular}
+\caption{Mapeamento de memória.}
+\label{tab.memlayout} % is used to refer this table in the text
+\end{table}
+
+A parte que nos interessa é saber que a RAM começa em \verb+0x0010_0000+ (1MB) e termina em \verb+0x3FFF_FFFF+ (1GB). É óbvio que apesar do mapeamento ir até 1GB, o sistema está limitado a quanto de memória física existe, que no caso são 512MB.
+
+
+
+
+\subsection{Modos de Operação}
+A arquitetura ARMv7 conta com 9 modos de operação (7 por padrão, mais 2 com extensões habilidadas), sendo que o único modo não privilegiado é o modo de usuário, os demais 7 modos padrão possuem o mesmo privilégio dentro do sistema. A principal diferença entre um modo e outro é que cada modo conta com um certo subconjunto privado de registradores, visiveis somente no modo em vigência, detalhes sobre estes registradores seguem na seção seguinte. A tabela abaixo ilustra quais são os modos de operação disponíveis\cite[p.~1139]{armarm}%\footnote{ARM DDI 0406C.b (ARM ARM), p. 1139}.
+O campo ``Codificação'' é usado no registrador CPSR para se verificar ou modificar o modo de operação.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{ccc}
+\hline\hline                        %inserts double horizontal lines
+Modo do processador  & Codificação & Implementado?\\ [0.5ex] % inserts table 
+%heading
+\hline                  % inserts single horizontal line
+User & 10000 & Sempre \\
+FIQ & 10001 & Sempre \\
+IRQ & 10010 & Sempre \\
+Supervisor & 10011 & Sempre\\
+Monitor & 10110 & Com extenções de segurança.\\
+Abort & 10111 & Sempre\\
+Hyp & 11010 & Com extenções de virtualização.\\
+Undefined & 11011 & Sempre\\
+System & 11111 & Sempre\\[1ex]
+\hline %inserts single line
+\end{tabular}
+\caption{Modos do processador.}
+\label{tab.processormode} % is used to refer this table in the text
+\end{table}
+
+\textbf{Modo Usuário:} Modo não-privilegiado de execução. Neste modo somente é possível de se fazer acesso não privilegiado aos recursos do hardware (não prodendo acessar as áreas protegidas). Não é possível de se mudar para outro modo de operação quando neste.
+
+\textbf{Modo Sistema:} Modo privilegiado de execução. Este modo usa os mesmos registradores que o modo usuário e nenhuma exceção leva a este modo.
+
+\textbf{Modo Supervisor:} É o modo padrão para que o processador utiliza quando exceção do tipo \emph{Supervisor Call} é recebida.
+Para gerar um \emph{Supervisor Call}, usa-se a instrução \verb+svc+. O processador entra neste modo ao se resetar.
+
+\textbf{Modo Aborto:} Modo que o processador entra quando recebe uma interrupção do tipo \emph{prefetch abort} ou \emph{data abort}.
+
+\textbf{Modo Indefinido:} Modo que o processador entra quando se tenta executar uma instrução não definida.
+
+\textbf{Modo FIQ:} Modo que o processador entra quando recebe uma interrupção FIQ.
+
+\textbf{Modo IRQ:} Modo que o processador entra quando recebe uma interrupção IRQ.
+
+\textbf{Modo Hipervisor:} Este modo possui ainda mais privilégios que os demais modos, mas somente existe quando as extenções de virtualização estão ativas (fora do escopo deste trabalho).
+
+\textbf{Modo Monitor:} Modo que o processador entra quando recebe uma interrupção \emph{Secure Monitor Call}, \verb+SMC+. Este modo está fora do escopo do trabalho.
+
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=12cm]{figuras/banked_registers}
+    \caption{Banked registers.}
+\end{figure}
+
+\subsection{GIC}
+O GIC (\emph{Generic Interrupt Controller}) é um componente que centraliza e administra todas as interrupções do sistema, ativando, desativando, mascarando e priorizando as fontes de interrupção.
+
+\subsection{Tipos de Interrupção} %ug585 p. 192
+
+\textbf{Interrupção Gerada por Software: }
+Cada CPU pode se interromper, interromper outra CPU, ou ambas CPUs usando SGIs (\emph{Software Generated Interrupts}). Existem 16 interrupções geradas por software, que podem ser geradas escrevendo o número da interrupção ([0-15]), junto com o número da CPU alvo no registrador ICDSGIR. Esta escrita ocorre dentro do barramento privado da própria CPU. Cada CPU possui seu próprio conjunto privado de registradores de SGIs para gerarem uma (ou mais) das 16 SGIs possíveis. É possível de se limpar uma interrupção lendo o registrador ICCIAR (\emph{Interrupt Acknowledge}) ou escrevendo 1 nos bits correspondentes do registrador ICDICPR (\emph{Interrupt Clear-Pending}).
+\\\\
+\textbf{Interrupções de Periféricos Privados da CPU: }
+Cada CPU está conectada a um conjunto privado de 5 interrupções de periféricos, são eles: Relógio Global (\emph{Global Timer}), nFIQ (\emph{Fast Interrupt}), Relógio privado da CPU, \emph{Watchdog} privado da CPU e nIRQ (interrupção vinda da lógica programável).
+\\\\
+\textbf{Interrupções de Periféricos Compartilhados: }
+Existem cerca de 60 interrupções de diversos modulos que podem ser roteadas para um ou ambos processadores, ou para a lógica programável. O GIC é responsável por administrar estas interrupções.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=16cm]{figuras/zynq-7000}
+    \caption{Arquitetura do Zynq 7000.}
+\end{figure}
+
+\subsection{Cronômetros (\emph{timers})}
+Cada um dos \emph{cores} possui um cronômetro privado de 32 bits e ambos \emph{cores} compartilham um cronômetro global de 64 bits. Estes relógios trabalham numa frequência sempre igual à metade da frequência da CPU.
+No nível de sistema (\emph{sistem-level (PL)}), há dois cronômetros triplos, cujas frequências são sempre um quarto e um sexo da frequência da CPU.
+
+
+
+
+\subsection{\emph{Clocks}}
+
+%30 <= PS_CLK <= 60MHZ
+
+\cite[p.~622]{ug585}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\hline\hline
+Nomenclatura & \emph{Clock Ratio} & Máxima frequência da CPU\\[0.5ex]
+\hline
+CPU\_6x4x & \multirow{4}{*}{6:2:1} & 667 MHZ\\
+CPU\_3x2x &                        & 333 MHZ\\
+CPU\_2x   &                        & 222 MHZ\\
+CPU\_1x   &                        & 111 MHZ\\
+\hline
+CPU\_6x4x & \multirow{4}{*}{4:2:1} & 533 MHZ\\
+CPU\_3x2x &                        & 267 MHZ\\
+CPU\_2x   &                        & 267 MHZ\\
+CPU\_1x   &                        & 133 MHZ\\[1ex]
+\hline
+\end{tabular}
+\caption{Máximas frequências possíveis para cada configuração de \emph{clock}. Para uma lista mais completa (com as diferentes graduações de \emph{clock}), veja \cite[p.~13]{data_sheet}.}
+\end{table}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=8cm]{figuras/zedboard}
+    \caption{Diagrama de blocos dos \emph{clocks} disponíveis no Zynq.}
+\end{figure}
+
+\subsection{UART}
+A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata da saída e entrada serial do sistema, portanto sendo o componente responsável por transmitir e receber caracteres, sendo necessário para impressão em tela. As duas principais funções na classe da UART dentro do EPOS são justamente a put(char c) e get(). O Zynq possui duas UARTs.
+
+
+
+\subsection{MMU} %http://epos.lisha.ufsc.br/EPOS+User+Guide#MMU
+
+A MMU (\emph{Memory Managemed Unit}) é um componente responsável por gerenciar a memória de um sistema. É este componente o responsável por traduz o endereçamento física em endereçamento lógico e vice-versa. Uma das principais vantagens de seu uso é a possibilidade de proteção de memória.
+
+\section{Ambiente de Desenvolvimento}
+
+QEMU, JTAG, crosscompilers...
+
+\chapter{Porte}
+
+Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões e dificuldades encontradas.
+%escrever sobre registradores mapeados em memória, exemplificar como se escreve neles.
+Antes de entrar nas especifícidades de cada componente, é interessante colocar aqui alguns conceitos comuns que são usados em cada mediador.
+
+A maneira usada para se comunicar, configurar e ler o estado de um dado componente de hardware se dá através da leitura e/ou escrita em registradores mapeados em memória. Um registrador mapeado em memória basicamente é uma região fixa da memória, onde uma escrita naquela posição indica uma escrita no registrador lá mapeado.
+Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, responsável por indicar quantos ciclos\footnote{Na realidade é o número de baud\_sample que se passaram.} a UART deve esperar um novo caractere chegar antes de emitir uma interrupção de \emph{timeout}. Este registrador está mapeado na posição de memória 0xE000001C para a UART0. Portanto, para configurar que o número de ciclos esperado seja de 20, basta escrever este número naquela posição. Uma maneira de fazer esta escrita, por exemplo, em C/C++, é: \verb+*((unsigned long*)0xE000001C) = 20;+.
+
+
+
+\section{Boot}
+\section{Porte da UART}
+
+A inicialização da UART foi feita de acordo com como o sugerido pelo manual em \cite[p.~554]{ug585}. Nesta seção será comentado as decisões tomadas na configuração inicial da UART, em particular por causa dos momentos em que o manual precisava que o desenvolvedor tomasse uma decisão.
+
+A primeira decisão que foi necessária é a de escabelecer qual será a taxa de transmissão (\emph{Baud Rate}) da UART. 
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=10cm]{figuras/uart_board_rate}
+    \caption{Esquemático de como é criada a taxa de transmissão.}
+\end{figure}
+
+Primeiramente foi necessário de se configurar o clock de referência da UART, que foi definido como 
+
+\section{Porte do Relógio}
+
+
+
+
+
+\bibliographystyle{ufscThesis/ufsc-alf}
+\bibliography{references}
+
+%--------------------------------------------------------
+% Elementos pós-textuais
+%\apendice
+%\chapter{Exemplificando um Apêndice}
+%Texto do Apêndice aqui. 
+
+%\anexo
+%\chapter{Exemplificando um Anexo}
+%Texto do anexo aqui.
+\end{document}
