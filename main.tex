@@ -90,13 +90,13 @@ Sistemas embarcados crescem em poder de processamento conforme o mercado faz sua
 \abreviatura{SP}{\emph{Stack Pointer}}
 \abreviatura{PC}{\emph{Program Counter}}
 \abreviatura{LR}{\emph{Link Register}}
-\abreviatura{CPSR}{\emph{Current Program Status Register (The register that holds the current operating processor status).}}
-\abreviatura{SPSR}{\emph{Saved Program Status Register (The register that holds the CPSR of the taskimmediately before the exception occurred that caused the switch to the current mode,so that it can be restored after handling the exception).}}
+\abreviatura{CPSR}{\emph{Current Program Status Register}. O registrador que armazena o atual status do processador operante.}
+\abreviatura{SPSR}{\emph{Saved Program Status Register}. (Registrador que armazena o valor de CPSR no momento imediatamente anterior ao acontecimento de uma exceção, deste modo o antigo valor de CPSR pode ser restaurado quando a exceção for tratada.}
 \abreviatura{CP15}{\emph{System Control Coprocessor}}
-\abreviatura{IRQ}{\emph{ }}
-\abreviatura{FIQ}{\emph{Fast Interrupt}}
-\abreviatura{SCR}{\emph{ }}
-\abreviatura{APSR}{\emph{The Application Program Status Register (APSR) holds copies of the Arithmetic Logic Unit (ALU) status flags. They are also known as the condition code flags. They are used to determine whether conditional instructions are executed or not.}}
+\abreviatura{IRQ}{Interrupção normal.}
+\abreviatura{FIQ}{\emph{Fast Interrupt}.}
+%\abreviatura{SCR}{\emph{ }}
+\abreviatura{APSR}{\emph{Application Program Status Register}. Armazena uma cópia do estado das \emph{flags} da unidade lógico-aritimética. Conhecido também como \emph{flag} do código condicional, usados para determinar se uma instrução condicional deve ser executada ou não.}
 \abreviatura{GIC}{\emph{Generic Interrupt Controler}}
 \abreviatura{rx}{Quando a abreviação rx aparecer, ela estará se referindo genericamente à qualquer um dos 13 primeiros registradores de propósito geral do ARM9 [r0-r12].}
 \abreviatura{PPI}{\emph{Private Peripheral Interrupt.}}
@@ -106,7 +106,7 @@ Sistemas embarcados crescem em poder de processamento conforme o mercado faz sua
 \abreviatura{PL}{\emph{Programmable Logic.}}
 \abreviatura{SMC}{\emph{Static Memory Controller}}
 \abreviatura{TSC}{\emph{Time Stamp Counter.}}
-
+\abreviatura{FPGA}{\emph{Field-Programmable Gate Array}. Hardware reconfigurável, o qual têm as suas funcionalidades definidas exclusivamente pelos usuários.}
 
 
 \begin{document}
@@ -212,15 +212,7 @@ De acordo com a específicação da Zedboard\cite{zedboard}, o \emph{clock} máximo 
 
 Há disponível 512mb de RAM DDR3, e um SD card de 4GB. A Zedboard suporta conexão com JTAG, saída serial (usb UART) e conexão com a internet\cite{xilinx}.
 
-
-\cite[p.~26]{ug585}
-%The Zynq-7000 family offers the flexibility and scalability of an FPGA, while providing performance,
-%power, and ease of use typically associated with ASIC and ASSPs. The range of devices in the
-%Zynq-7000 AP SoC family enables designers to target cost-sensitive as well as high-performance
-%applications from a single platform using industry-standard tools. While each device in the
-%Zynq-7000 family contains the same PS, the PL and I/O resources vary between the devices. As a
-%result, the Zynq-7000 AP SoC devices are able to serve a wide range of applications including:
-
+A família Zynq 7000 disponibiliza para o desenvolvedor FPGAs, tornando esta plataforma mais configurável e flexível\cite[p.~26]{ug585}. A PS dessa família é a mesma para cada dispositivo onde ela se encontra, entretanto a PL e recursos de saída/entrada variam entre diferentes dispositivos, como no caso da Zedboard, que possui sua próprio mapeamento de recursos de entrada e saída diferentes da Pandaboard\footnote{Pandaboard é outra plataforma concorrente à Zedboard que também se utiliza do Zynq 7000.}.
 
 
 \begin{figure}[ht!]
