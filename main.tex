@@ -7,6 +7,7 @@
 \usepackage{listings}
 
 
+\usepackage{amsmath}
 \usepackage{multirow}
 \usepackage{url}
 %\usepackage{hyperref}
@@ -398,21 +399,32 @@ Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, respon
 \section{Boot}
 \section{Porte da UART}
 
-A inicialização da UART foi feita de acordo com como o sugerido pelo manual em \cite[p.~554]{ug585}. Nesta seção será comentado as decisões tomadas na configuração inicial da UART, em particular por causa dos momentos em que o manual precisava que o desenvolvedor tomasse uma decisão.
+A inicialização da UART foi feita de acordo com como o sugerido pelo manual em \cite[p.~554]{ug585}. Nesta seção será comentado as decisões tomadas na configuração inicial da UART, em particular por causa dos momentos em que o manual exigia que o desenvolvedor tomasse uma decisão.
 
 A primeira decisão que foi necessária é a de escabelecer qual será a taxa de transmissão (\emph{Baud Rate}) da UART. 
 
-\begin{figure}[h!]
+\begin{figure}[ht!]
     \centering
     \includegraphics[width=10cm]{figuras/uart_board_rate}
     \caption{Esquemático de como é criada a taxa de transmissão.}
+	\label{tab:uart}
 \end{figure}
 
-Primeiramente foi necessário de se configurar o clock de referência da UART, que foi definido como 
+Primeiramente foi necessário de se configurar o clock de referência da UART. Para isto, deve-se dividir o clock que vem do I/O PLL (que por sua vez deriva do PS\_CLK, que é o clock geral do sistema). Recomenda-se dividir o clock da I/O PLL de modo a se obter 50 ou 33 MHz. Assume-se que o clock vindo do I/O PLL seja de 667 MHz (sendo este valor tendo sido previamente configurado). No manual diversas vezes é usado como exemplo para o clock de referência da UART 50 MHz, portanto, arbitrariamente, escolheu-se esse valor. Logo, deve-se configurar o registrador UART\_CLK\_CTRL para dividir o clock por 13 ($667/13 = 50$).
+
+Agora, com este clock estabelecido, que vamos chamar de sel\_clk (de acordo com a nomemclatura em \cite[p.~543]{ug585}), devemos calcular quanto será a taxa de transmissão.
+Após alguma pesquisa em fóruns de desenvolvedores de software básico, notei que uma taxa de transmissão de 9600 bps é o mais comum, portanto, assumindo este valor, e usando os valores de referência da tabela 19 de \cite[p.~544]{ug585}, obtem-se $CD=651$ e $BDIV=7$, sendo CD apenas uma constante para se dividir o clock, e BDIV um segundo divisor usado para sobreamostragem, organizado como mostrado na tabela \ref{tab:uart}. O valor da taxa de transmissão final é calculado da seguinte forma:
+\begin{equation}
+	\text{taxa de transmissão} = \frac{sel\_clk}{CD \times (BDIV+1)}
+\end{equation}
+
+
 
 \section{Porte do Relógio}
 
 
+
+\section{Mapeamento de Memória}
 
 
 
