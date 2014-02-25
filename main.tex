@@ -107,7 +107,7 @@ Sistemas embarcados crescem em poder de processamento conforme o mercado faz sua
 \abreviatura{SMC}{\emph{Static Memory Controller}}
 \abreviatura{TSC}{\emph{Time Stamp Counter.}}
 \abreviatura{FPGA}{\emph{Field-Programmable Gate Array}. Hardware reconfigurável, o qual têm as suas funcionalidades definidas exclusivamente pelos usuários.}
-
+\abreviatura{PLL}{\emph{Phase-Locked Loop}. É um sistema de controle que gera uma saída cuja fase é relacionada à fase do sinal de entrada. Pode ser usada para manter estabilizar um sinal e também multiplica-lo.}
 
 \begin{document}
 
@@ -227,6 +227,7 @@ Como já citado, o Zynq 7000 possui um processador dual core Cortex A9, cada core
 %layout de memoria
 \subsection{OCM} O \emph{On-chip Memory} é uma pequena memória de 256KB de RAM que fica próxima ao processador, e portanto tem um acesso mais rápido. O OCM pode ser mapeado nos primeiros 256KB do espaço de endereçamento, ou nos últimos 256KB do espaço de endereçamento\cite{ug585} (como mostrado na tabela \ref{tab.memlayout}).
 
+
 \subsection{Layout de memória} 
 A tabela abaixo é uma simplificação do layout de memória do Zynq\footnote{Uma tabela mais completa e detalhada pode ser encontrada em UG585 (v1.6.1), p. 115.}.
 
@@ -305,8 +306,11 @@ Para gerar um \emph{Supervisor Call}, usa-se a instrução \verb+svc+. O processad
     \caption{Banked registers.}
 \end{figure}
 
+
+
 \subsection{GIC}
 O GIC (\emph{Generic Interrupt Controller}) é um componente que centraliza e administra todas as interrupções do sistema, ativando, desativando, mascarando e priorizando as fontes de interrupção.
+
 
 \subsection{Tipos de Interrupção} %ug585 p. 192
 
@@ -325,6 +329,7 @@ Existem cerca de 60 interrupções de diversos modulos que podem ser roteadas para
     \caption{Arquitetura do Zynq 7000.}
 \end{figure}
 
+
 \subsection{Cronômetros (\emph{timers})}
 Cada um dos \emph{cores} possui um cronômetro privado de 32 bits e ambos \emph{cores} compartilham um cronômetro global de 64 bits. Estes relógios trabalham numa frequência sempre igual à metade da frequência da CPU.
 No nível de sistema (\emph{sistem-level (PL)}), há dois cronômetros triplos, cujas frequências são sempre um quarto e um sexo da frequência da CPU.
@@ -335,37 +340,46 @@ No nível de sistema (\emph{sistem-level (PL)}), há dois cronômetros triplos, cuj
 \subsection{\emph{Clocks}}
 
 %30 <= PS_CLK <= 60MHZ
+O \emph{clock} principal do sistema, chamado aqui de PS\_CLK (\emph{Processing System Clock}), é responsável por alimentar as 3 PLLs do sistema, sendo cada uma dessas PLLs responsável por uma parte diferente do sistema\cite[p.~622]{ug585}. O PS\_CLK é um \emph{clock} de baixa frequência, ficando entre 30 a 60 Hz, sendo este multiplicado por cada uma das 3 PLLs para que o sistema funcione com velocidades maiores. As 3 PLLs são: I/O PLL
+\begin{itemize}
+	\item \textbf{I/O PLL:} Responsável por produzir o sinal de clock para os dispositivos de entrada e saída.
+	\item \textbf{DDR PLL:} Responsável por produzir o sinal de clock para as memórias da plataforma.
+	\item \textbf{ARM PLL:} Responsável por produzir o sinal de clock o restante do sistema, incluindo os processadores.
+\end{itemize}
 
-\cite[p.~622]{ug585}
+A FPGA da Zedboard possui um clock próprio e exclusivo.
+
+A Zedboard pode operar em dois modos (ou velocidades), dados pela razão 6:3:2:1 e 4:2:2:1, abreviados como 6:2:1 e 4:2:1. Estes números indicam quantas vezes cada \emph{clock} multiplica o \emph{clock} de base CPU\_1x. Há 4 \emph{clocks} independentes, chamados de CPU\_6x4x, CPU\_3x2x, CPU\_2x e CPU\_1x. Esta nomenclatura dos clocks indica o fator pelo qual o CPU\_1x é multiplicado em cada modo, portanto no modo 6:2:1, o CPU\_6x4x multiplica o CPU\_1x 6 vezes, e no modo 4:2:1 4 vezes. A tabela \ref{tab:clocks} ilustra a velocidade de cada \emph{clock} em cada um dos dois modos.
 
 \begin{table}[ht]
-\centering
-\begin{tabular}{ccc}
-\hline\hline
-Nomenclatura & \emph{Clock Ratio} & Máxima frequência da CPU\\[0.5ex]
-\hline
-CPU\_6x4x & \multirow{4}{*}{6:2:1} & 667 MHZ\\
-CPU\_3x2x &                        & 333 MHZ\\
-CPU\_2x   &                        & 222 MHZ\\
-CPU\_1x   &                        & 111 MHZ\\
-\hline
-CPU\_6x4x & \multirow{4}{*}{4:2:1} & 533 MHZ\\
-CPU\_3x2x &                        & 267 MHZ\\
-CPU\_2x   &                        & 267 MHZ\\
-CPU\_1x   &                        & 133 MHZ\\[1ex]
-\hline
-\end{tabular}
-\caption{Máximas frequências possíveis para cada configuração de \emph{clock}. Para uma lista mais completa (com as diferentes graduações de \emph{clock}), veja \cite[p.~13]{data_sheet}.}
+	\centering
+	\begin{tabular}{ccc}
+		\hline\hline
+		Nomenclatura & \emph{Clock Ratio} & Máxima frequência da CPU\\[0.5ex]
+		\hline
+		CPU\_6x4x & \multirow{4}{*}{6:2:1} & 667 MHZ\\
+		CPU\_3x2x &                        & 333 MHZ\\
+		CPU\_2x   &                        & 222 MHZ\\
+		CPU\_1x   &                        & 111 MHZ\\
+		\hline
+		CPU\_6x4x & \multirow{4}{*}{4:2:1} & 533 MHZ\\
+		CPU\_3x2x &                        & 267 MHZ\\
+		CPU\_2x   &                        & 267 MHZ\\
+		CPU\_1x   &                        & 133 MHZ\\[1ex]
+		\hline
+	\end{tabular}
+	\caption{Máximas frequências possíveis para cada configuração de \emph{clock}. Para uma lista mais completa (com as diferentes graduações de \emph{clock}), veja \cite[p.~13]{data_sheet}.}
+	\label{tab:clocks}
 \end{table}
 
 \begin{figure}[ht!]
     \centering
     \includegraphics[width=8cm]{figuras/zedboard}
-    \caption{Diagrama de blocos dos \emph{clocks} disponíveis no Zynq.}
+	\caption{Diagrama de blocos dos \emph{clocks} disponíveis no Zynq. Note \emph{clocks} da tabela \ref{tab:clocks} no canto superior direito da imagem.}
 \end{figure}
 
 \subsection{UART}
-A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata da saída e entrada serial do sistema, portanto sendo o componente responsável por transmitir e receber caracteres, sendo necessário para impressão em tela. As duas principais funções na classe da UART dentro do EPOS são justamente a put(char c) e get(). O Zynq possui duas UARTs.
+A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata da saída e entrada serial do sistema, portanto sendo o componente responsável por transmitir e receber caracteres, sendo necessário para impressão em tela. As duas principais funções na classe da UART dentro do EPOS são justamente a put e get, para impressão e leitura de caractere, respectivamente. O Zynq possui duas UARTs.
 
 
 
@@ -388,7 +402,9 @@ Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, respon
 
 
 
-\section{Boot}
+%\section{Boot}
+
+
 \section{Porte da UART}
 
 A inicialização da UART foi feita de acordo com como o sugerido pelo manual em \cite[p.~554]{ug585}. Nesta seção será comentado as decisões tomadas na configuração inicial da UART, em particular por causa dos momentos em que o manual exigia que o desenvolvedor tomasse uma decisão.
@@ -412,9 +428,12 @@ Após alguma pesquisa em fóruns de desenvolvedores de software básico, notei que 
 
 
 
-\section{Porte do Relógio}
+\section{Porte do Cronômetro}
 
+O porte dos cronômetros (\emph{timers}) foi relativamente simples. Os 4 principais registradores a se trabalhar são o \emph{load}, registrador onde se escreve por quantos ciclos se deve contar; o \emph{counter}, que é o cronômetro em si, sendo decrementado a cada ciclo até chegar em zero, chegando em zero o é gerada uma interrupção número 29; registrador \emph{control}, que permite configurar certos comportamentos do cronômetro, como o de ativa-lo, ativar modo cíclico, ativar interrupções e atribuir um valor para o \emph{prescale}; e finalmente o registrador \emph{interrupt status}, que, como o nome indica, permite que se leia o status das interrupções de timer. Todos os timers trabalham à metade do \emph{clock} do sistema, ou seja, usando o clock CPU\_3x2x.
 
+%falar sobre o prescale
+%mostrar como se calcula tempo com ciclos
 
 \section{Mapeamento de Memória}
 
