@@ -50,12 +50,14 @@
 %{(Autor da epígrafe, ano)}
 
 \textoResumo {
-	Sistemas embarcados crescem em poder de processamento conforme o mercado faz suas demandas. Com a difusão de aparelhos mais potentes (no âmbito de sistemas embarcados) como \emph{smartphones} e \emph{tablets}, processadores RISC alcançaram \emph{clocks} da ordem de gigahertz, bem como mais \emph{cores}. Processadores multicores possibilitam linhas de pesquisa que precisam de paralelismo real para serem validadas, como por exemplo o estudo do subsistema de memória compartilhada do EPOS em um RISC. Este trabalho visa descrever e documentar como o sistema operacional EPOS foi portado para o Zedboard, uma plataforma \emph{multicore}.
+	No mundo dos sistemas operacionais embarcados, há uma grande variedade de diferentes arquiteturas, e, consequentemente, um sistema operacional embarcado necessita dar suporte a um bom número de arquiteturas para ser usável em diversos cenários. 
+	O sistema operacional EPOS possui uma arquitetura que tenta ser o mais independente de plataforma possível, entretanto o interfaceamento entre o software e hardware inevitavelmente necessita ser reescrito.
+	Este trabalho visa descrever e documentar como o sistema operacional EPOS foi portado para a Zedboard, uma plataforma ARM \emph{multicore}.
 }
 \palavrasChave {Systemas Operacionais. Portabilidade. EPOS.}
  
 \textAbstract {
-	Embedded systems's processing power increases accordingly to the market's demands. As more powerful embedded systems are becoming widespread through smartphones and tablets, RISC processors achieved clocks in the order of gigahertz, and also with more cores. Multicore processors enable research lines that require real parallelism in order to be validated, like for instance the study of EPOS shared memory subsystem in a RISC. This work aims to describe and document how the EPOS operating system was ported to the Zedboard, a multicore SoC.
+	
 }
 \keywords {Operating Systems. Porting. EPOS.}
 
@@ -122,12 +124,12 @@
 
 \chapter{Introdução}
 
-O presente trabalho visa descrever como foi feito o port do sistema operacional EPOS para a plataforma Zedboard, bem como comentar sobre as decisões tomadas e problemas enfrentados.
+O presente trabalho visa descrever como foi feito o porte do sistema operacional EPOS para a plataforma Zedboard, bem como comentar sobre as decisões tomadas e problemas enfrentados.
 
 \section{Motivação}
 EPOS é um sistema operacional que visa reduzir o custo de produção das aplicações embarcadas provendo um ambiente onde a aplicação do desenvolvedor possa rodar sem que ele tenha que lidar com configurações de baixo nível. Sendo assim é importante que o EPOS seja portado para um grande número de plataformas, do contrário sua utilidade prática seria prejudicada.
 
-Zedboard é uma plataforma que usa o SoC Xilinx 7000, que por sua vez possui o processador \emph{dual core} ARM Cortex A9. Existe uma dupla motivação para se fazer o porte para esta plataforma: Primeiro que o EPOS ainda não foi portado para um processador RISC \emph{multicore}, e acredita-se que este port poderá possibilitar linhas de pesquisa com o EPOS que antes só poderiam ser feitos num CISC, algo que não é o ideal considerando-se o nicho de aplicação do EPOS. O segundo fator está relacionado com o próprio Zedboard. Dentro do LISHA (Laboratório de Integração Software-Hardware) há uma linha de pesquisa sobre Smart Homes (ou Smart Buildings) em cujo contexto se pretende usar um Zedboard. Mais detalhes sobre Smart Homes estão presentes nas próximas seções.
+Zedboard é uma plataforma que usa o SoC Xilinx 7000, que por sua vez possui o processador \emph{dual core} ARM Cortex A9. Existe uma dupla motivação para se fazer o porte para esta plataforma: Primeiro que o EPOS ainda não foi portado para um processador RISC \emph{multicore}, e acredita-se que este porte poderá possibilitar linhas de pesquisa com o EPOS que antes só poderiam ser feitos num CISC, algo que não é o ideal considerando-se o nicho de aplicação do EPOS. O segundo fator está relacionado com o próprio Zedboard. Dentro do LISHA (Laboratório de Integração Software-Hardware) há uma linha de pesquisa sobre Smart Homes (ou Smart Buildings) em cujo contexto se pretende usar um Zedboard.
 
 \section{Objetivos Gerais}
 
@@ -174,12 +176,12 @@ Como o objetivo é criar um ambiente em que o desenvolvedor possa rapidamente pro
 % Fonte: Hardware Mediators: A Portability Artifact for Component-based Systems
 % HAL vs Virtualização vs Mediadores
 
-Mediadores de hardware são uma nova alternativa ao tradicional uso de VMs\footnote{Virtual Machines.} e de HAL\footnote{Hardware Abstraction Layer}, proposta por Fröhlich em seu trabalho \emph{Application-Oriented System Design} \cite{guto_thesis}. O problema do uso de VMs é o seu \emph{overhead} causado devido à tradução das operações da VM em código nativo. Já o uso de um HAL incorre no problema da manutenibilidade e dificuldade de adapção à novas arquiteturas muito distintas entre si \cite{hw_mediators}. O HAL não conseguiu passar pela prova do tempo, e já está sendo considerado obsoleto por distribuições GNU/Linux populares, como o 
+Mediadores de hardware são uma alternativa ao tradicional uso de VMs\footnote{Virtual Machines.} e de HAL\footnote{Hardware Abstraction Layer}, proposta por Fröhlich em seu trabalho \emph{Application-Oriented System Design} \cite{guto_thesis}. O problema do uso de VMs é o seu \emph{overhead} causado devido à tradução das operações da VM em código nativo. Já o uso de um HAL incorre no problema da manutenibilidade e dificuldade de adapção à novas arquiteturas muito distintas entre si \cite{hw_mediators}. O HAL não conseguiu passar pela prova do tempo, e já está sendo considerado obsoleto por distribuições GNU/Linux populares, como o 
 Ubuntu\footnote{\url{http://www.linux-magazine.com/Online/News/Ubuntu-10.04-Alpha-2-Removes-HAL}}, sendo chamado de ``uma grande não-manutenível bagunça monolítica''\footnote{\url{https://wiki.ubuntu.com/Halsectomy}}.
 
 
 
-\textbf{Traits:} Traits é uma classe onde se é possível configurar certos componentes do EPOS em tempo de compilação. Lá é possível, por exemplo, de se definir o tamanho da stack e heap do sistema, a sua frequência de clock bem como ativar ou desativar certas funções do sistema. Esta classe normalmente precisa ser alterada em um porte, mesmo ela não sendo um mediador de hardware.
+\textbf{Traits:} Traits é uma classe onde é possível configurar certos componentes do EPOS em tempo de compilação. Lá é possível, por exemplo, definir o tamanho da stack e heap do sistema, a sua frequência de clock bem como ativar ou desativar certas funções do sistema. Esta classe normalmente precisa ser alterada em um porte, mesmo ela não sendo um mediador de hardware.
 
 \textbf{Interface Infladas: } Um conceito importante da arquitetura do EPOS é a Interface Inflada. %http://www.inf.ufsc.br/~guto/publications/aoos.pdf
 Em sistemas orientados a aplicação, famílias de abstrações são frequentemente tratadas como entidades únicas, algo que pode ser vantajoso para o programador da aplicação, já que este não precisaria se preocupar com qual membro em específico desta família ele precisaria usar\cite{guto_thesis}.
@@ -196,15 +198,16 @@ Interface inflada basicamente é uma interface que declara os métodos de todas as
 
 \section{Hardware-alvo}
 %source: http://www.zedboard.org/product/zedboard
-Zedboard é uma plataforma de desenvolvimento que suporta uma grande variedade de aplicações, visto que ela possui uma boa gama de interfaces e funções para habilitar isto. É uma dedicada à prototipação e \emph{proof-of-concept}. Em seu interior ela possui um Xilinx Zynq 7000 (Z-7020), que é a arquitetura alvo deste porte.
+% http://www.zedboard.org/sites/default/files/documentations/ZedBoard_HW_UG_v2_2.pdf
+Zedboard é uma plataforma de desenvolvimento que suporta uma grande variedade de aplicações, visto que ela possui uma boa gama de interfaces e funções para habilitar isto. É dedicada à prototipação e \emph{proof-of-concept}. Em seu interior ela possui um Xilinx Zynq 7000 (Z-7020), que é a arquitetura alvo deste porte.
 
 O ZYNQ-7000 SOC XC7Z020-CLG484-1 conta com o processador Dual ARM Cortex-A9 MPCore. O Zynq possui 4 graduações de velocidade de \emph{clock}, a comercial (graduação -1), industrial (graduação -1 a -2), estendida (-2 a -3) e expandida (-1), sendo a graduação -1 a menor velocidade, e a -3 a maior \cite{product_table}.
 
-De acordo com a específicação da Zedboard \cite{zedboard}, o \emph{clock} máximo do processador é de 667MHZ, portanto, tendo como referência a tabela de dados do Zynq-7000 \cite[p.~13]{data_sheet}, chegamos à conclusão que a graduação de velocidade do Zynq usado na Zedboard é de -1 (comercial), esta informação se tornará útil mais à frente.
+De acordo com a especificação da Zedboard \cite{zedboard}, o \emph{clock} máximo do processador é de 667MHZ, portanto, tendo como referência a tabela de dados do Zynq-7000 \cite[p.~13]{data_sheet}, chegamos à conclusão que a graduação de velocidade do Zynq usado na Zedboard é de -1 (comercial), esta informação se tornará útil mais à frente.
 
 Há disponível 512MB de RAM DDR3, e um SD card de 4GB. A Zedboard suporta conexão com JTAG, saída serial (USB UART) e conexão com a internet \cite{xilinx}.
 
-A família Zynq 7000 disponibiliza para o desenvolvedor FPGAs, tornando esta plataforma mais configurável e flexível \cite[p.~26]{ug585}. A PS dessa família é a mesma para cada dispositivo onde ela se encontra, entretanto a PL e recursos de saída/entrada variam entre diferentes dispositivos, como no caso da Zedboard, que possui sua próprio mapeamento de recursos de entrada e saída diferentes da Pandaboard\footnote{Pandaboard é outra plataforma concorrente à Zedboard que também se utiliza do Zynq 7000.}.
+A família Zynq 7000 disponibiliza para o desenvolvedor FPGAs, tornando esta plataforma mais configurável e flexível \cite[p.~26]{ug585}. A PS dessa família é a mesma para cada dispositivo onde ela se encontra, entretanto a PL e recursos de entrada e saída variam entre diferentes dispositivos. 
 
 
 \begin{figure}[ht!]
@@ -275,12 +278,12 @@ System & 11111 & Sempre\\[1ex]
 
 \textbf{Modo Usuário:} Modo não-privilegiado de execução. Neste modo somente é possível de se fazer acesso não privilegiado aos recursos do hardware (não prodendo acessar as áreas protegidas). Não é possível de se mudar para outro modo de operação quando neste, a não ser por eventos externos como interrupções.
 
-\textbf{Modo Sistema:} Modo privilegiado de execução. Este modo usa os mesmos registradores que o modo usuário e nenhuma exceção leva a este modo.
+\textbf{Modo Sistema:} Modo privilegiado de execução. Este modo usa os mesmos registradores que o modo usuário e nenhuma exceção leva a este modo. Somente é possível de se entrar nesse modo alterando os bits do registrador de status do sistema (CPSR); é necessário já estar em algum modo privilegiado para tal operação.
 
 \textbf{Modo Supervisor:} É o modo padrão para no qual processador entra quando exceção do tipo \emph{Supervisor Call} é recebida.
 Para gerar um \emph{Supervisor Call}, usa-se a instrução \verb+svc+. O processador entra neste modo ao se resetar.
 
-\textbf{Modo Aborto:} Modo que o processador entra quando recebe uma interrupção do tipo \emph{prefetch abort} ou \emph{data abort}.
+\textbf{Modo Abort:} Modo que o processador entra quando recebe uma interrupção do tipo \emph{prefetch abort} ou \emph{data abort}.
 
 \textbf{Modo Indefinido:} Modo que o processador entra quando se tenta executar uma instrução não definida.
 
@@ -309,7 +312,7 @@ O GIC (\emph{Generic Interrupt Controller}) é um componente que centraliza e adm
 \subsection{Tipos de Interrupção} %ug585 p. 192
 \label{sec:interrupt}
 \textbf{Interrupção Gerada por Software: }
-Cada CPU pode se interromper, interromper outra CPU, ou ambas CPUs usando SGIs (\emph{Software Generated Interrupts}). Existem 16 interrupções geradas por software, que podem ser geradas escrevendo o número da interrupção ([0-15]), junto com o número da CPU alvo no registrador ICDSGIR. Esta escrita ocorre dentro do barramento privado da própria CPU. Cada CPU possui seu próprio conjunto privado de registradores de SGIs para gerarem uma (ou mais) das 16 SGIs possíveis. É possível de se limpar uma interrupção lendo o registrador ICCIAR (\emph{Interrupt Acknowledge}) ou escrevendo 1 nos bits correspondentes do registrador ICDICPR (\emph{Interrupt Clear-Pending}).
+Cada CPU pode se interromper, interromper outra CPU, ou ambas CPUs usando SGIs (\emph{Software Generated Interrupts}). Existem 16 interrupções geradas por software, que podem ser geradas escrevendo o número da interrupção ([0-15]), junto com o número da CPU alvo no registrador ICDSGIR. Esta escrita ocorre dentro do barramento privado da própria CPU. Cada CPU possui seu próprio conjunto privado de registradores de SGIs para gerarem uma (ou mais) das 16 SGIs possíveis. É possível limpar uma interrupção lendo o registrador ICCIAR (\emph{Interrupt Acknowledge}) ou escrevendo 1 nos bits correspondentes do registrador ICDICPR (\emph{Interrupt Clear-Pending}).
 \\\\
 \textbf{Interrupções de Periféricos Privados da CPU: }
 Cada CPU está conectada a um conjunto privado de 5 interrupções de periféricos, são eles: Relógio Global (\emph{Global Timer}), nFIQ (\emph{Fast Interrupt}), Relógio privado da CPU, \emph{Watchdog} privado da CPU e nIRQ (interrupção vinda da lógica programável).
@@ -335,7 +338,7 @@ No nível de sistema (\emph{sistem-level (PS)}), há dois cronômetros triplos, cuj
 \subsection{\emph{Clocks}}
 
 %30 <= PS_CLK <= 60MHZ
-O \emph{clock} principal do sistema, chamado aqui de PS\_CLK (\emph{Processing System Clock}), é responsável por alimentar as 3 PLLs do sistema, sendo cada uma dessas PLLs responsável por uma parte diferente do sistema\cite[p.~622]{ug585}. O PS\_CLK é um \emph{clock} de baixa frequência, ficando entre 30 a 60 Hz, sendo este multiplicado por cada uma das 3 PLLs\footnote{\emph{Phase-Locked Loop}. É um sistema de controle que gera uma saída cuja fase é relacionada à fase do sinal de entrada. Pode ser usada para estabilizar um sinal e também multiplica-lo.} para que o sistema funcione com velocidades maiores. As 3 PLLs são:
+O \emph{clock} principal do sistema, chamado aqui de PS\_CLK (\emph{Processing System Clock}), é responsável por alimentar as 3 PLLs do sistema, sendo cada uma dessas PLLs responsável por uma parte diferente do sistema\cite[p.~622]{ug585}. O PS\_CLK é um \emph{clock} de baixa frequência, ficando entre 30 a 60 MHz (PS\_CLK é igual a 33.33 MHz no caso da Zedboard), sendo este multiplicado por cada uma das 3 PLLs\footnote{\emph{Phase-Locked Loop}. É um sistema de controle que gera uma saída cuja fase é relacionada à fase do sinal de entrada. Pode ser usada para estabilizar um sinal e também multiplica-lo.} para que o sistema funcione com velocidades maiores\footnote{Este clock pode ser multiplicado por um número de 1 a 127, e é multiplicado por 26 por padrão}. As 3 PLLs são:
 
 \begin{itemize}
 	\item \textbf{I/O PLL:} Responsável por produzir o sinal de \emph{clock} para os dispositivos de entrada e saída.
@@ -343,9 +346,13 @@ O \emph{clock} principal do sistema, chamado aqui de PS\_CLK (\emph{Processing S
 	\item \textbf{ARM PLL:} Responsável por produzir o sinal de \emph{clock} o restante do sistema, incluindo os processadores.
 \end{itemize}
 
-A FPGA da Zedboard possui um clock próprio e exclusivo.
+A FPGA da Zedboard possui um \emph{clock} próprio e exclusivo.
 
-A Zedboard pode operar em dois modos (ou velocidades), dados pela razão 6:3:2:1 e 4:2:2:1, abreviados como 6:2:1 e 4:2:1. Estes números indicam quantas vezes cada \emph{clock} multiplica o \emph{clock} de base CPU\_1x. Há 4 \emph{clocks} independentes, chamados de CPU\_6x4x, CPU\_3x2x, CPU\_2x e CPU\_1x. Esta nomenclatura dos clocks indica o fator pelo qual o CPU\_1x é multiplicado em cada modo, portanto no modo \textbf{6}:2:1, o CPU\_\textbf{6x}4x multiplica o CPU\_1x 6 vezes, e no modo \textbf{4}:2:1, o CPU\_6x\textbf{4x} multiplica 4 vezes. A tabela \ref{tab:clocks} ilustra a velocidade de cada \emph{clock} em cada um dos dois modos.
+A Zedboard pode operar em dois modos (ou velocidades), denominados pela pela razão 6:3:2:1 e 4:2:2:1, abreviados como 6:2:1 e 4:2:1. Para alternar entre estes dois modos de velocidade, basta escrever 1 ou 0 no registrador CLK\_621\_TRUE. Estes números indicam quantas vezes cada \emph{clock} multiplica o \emph{clock} de base CPU\_1x, sendo este CPU\_1x um \emph{clock} derivado da ARM PLL, dividido por algum fator (configurável).
+
+Há 4 \emph{clocks} independentes, chamados de CPU\_6x4x, CPU\_3x2x, CPU\_2x e CPU\_1x. Esta nomenclatura dos \emph{clocks} indica o fator pelo qual o CPU\_1x é multiplicado em cada modo.
+A o primeiro número do nome indica o fator multiplicativo daquele \emph{clock} no modo 6:2:1, e o segundo número indica o fator multiplicativo no modo 4:2:1.
+Por exemplo, no modo \textbf{6}:2:1, o CPU\_\textbf{6x}4x multiplica o CPU\_1x 6 vezes, e no modo \textbf{4}:2:1, o CPU\_6x\textbf{4x} multiplica o CPU\_1x 4 vezes. A tabela \ref{tab:clocks} ilustra a velocidade de cada \emph{clock} em cada um dos dois modos.
 
 \begin{table}[ht]
 	\centering
@@ -375,17 +382,17 @@ A Zedboard pode operar em dois modos (ou velocidades), dados pela razão 6:3:2:1 
 \end{figure}
 
 \subsection{UART}
-A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata da saída e entrada serial do sistema, portanto sendo o componente responsável por transmitir e receber caracteres, sendo necessário para impressão em tela. As duas principais funções na classe da UART dentro do EPOS são justamente a put e get, para impressão e leitura de caractere, respectivamente. O Zynq possui duas UARTs.
+A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata da saída e entrada serial do sistema, portanto sendo o componente responsável por transmitir e receber caracteres, sendo necessário para impressão em tela, o que pode ser feito tanto por meio de um conector VGA quanto por USB (usado principalmente para depuração do código). As duas principais funções na classe da UART dentro do EPOS são justamente a put e get, para impressão e leitura de caractere, respectivamente. O Zynq possui duas UARTs.
 
 
 
 \subsection{MMU} %http://epos.lisha.ufsc.br/EPOS+User+Guide#MMU
 
-A MMU (\emph{Memory Managemed Unit}) é um componente responsável por gerenciar a memória de um sistema. É este componente o responsável por traduz o endereçamento física em endereçamento lógico e vice-versa. Uma das principais vantagens de seu uso é a possibilidade de proteção de memória.
+A MMU (\emph{Memory Managemed Unit}) é um componente responsável por gerenciar a memória de um sistema. É este componente o responsável por traduzir o endereçamento lógico em endereçamento físico. Uma das principais vantagens de seu uso é a possibilidade de proteção de memória.
 
 \section{Ambiente de Desenvolvimento}
 
-O ambiente de desenvolvimento usado para o porte foi o qemu para ARM (\verb+qemu-system-arm+), para executar o EPOS num ambiente virtualizado, pois assim poderia se usar ferramentas como o GDB para a depuração do código. O uso do GDB foi fundamental para o desenvolvimento, já que com ele era possível de se imprimir o valor de cada registrador em um dado ponto da execução, verificar a memória, executar instruções específicas e etc. Para compilar o EPOS foi usado \emph{cross-compilers} para ARM. As flags usadas para criar um ambiente de depuração com o qemu e o GDB foram as sequintes (com cada instrução feita em um terminal diferente):
+O ambiente de desenvolvimento usado para o porte foi o qemu para ARM (\verb+qemu-system-arm+), para executar o EPOS num ambiente virtualizado (emulado), pois assim pode-se usar ferramentas como o GDB para a depuração do código. O uso do GDB foi fundamental para o desenvolvimento, já que com ele era possível imprimir o valor de cada registrador em um dado ponto da execução, verificar a memória, executar instruções específicas e etc. Para compilar o EPOS foi usado \emph{cross-compilers} para ARM. As flags usadas para criar um ambiente de depuração com o qemu e o GDB foram as sequintes (com cada comando feito em um terminal diferente):
 \begin{verbatim}
 	qemu-system-arm -no-reboot -nographic -s -S -machine xilinx-zynq-a9\
 	-cpu cortex-a9 -kernel ./img/zynq_app -fda ./img/zynq_app.img
@@ -399,9 +406,9 @@ O hardware real também estava disponível, e foi usado quando quando o qemu não p
 
 Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões e dificuldades encontradas.
 
-Antes de entrar nas especifícidades de cada componente, é interessante colocar aqui alguns conceitos comuns que são usados em cada mediador.
+Antes de entrar nas especificidades de cada componente, é interessante colocar aqui alguns conceitos comuns que são usados em cada mediador.
 
-A maneira usada para se comunicar, configurar e ler o estado de um dado componente de hardware se dá através da leitura e/ou escrita em registradores mapeados em memória. Um registrador mapeado em memória basicamente é uma região fixa da memória, onde uma escrita naquela posição indica uma escrita no registrador lá mapeado.
+A maneira usada para se comunicar, configurar e ler o estado de um dado componente de hardware é através da leitura e/ou escrita em registradores mapeados em memória. Um registrador mapeado em memória basicamente é uma região fixa da memória, onde uma escrita naquela posição indica uma escrita no registrador lá mapeado.
 Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, responsável por indicar quantos ciclos\footnote{Na realidade é o número de baud\_samples que se passaram.} a UART deve esperar um novo caractere chegar antes de emitir uma interrupção de \emph{timeout}. Este registrador está mapeado na posição de memória 0xE000001C para a UART0. Portanto, para configurar que o número de ciclos esperado seja de 20, basta escrever este número naquela posição. Uma maneira de fazer esta escrita, por exemplo, em C/C++, é: \verb+*((unsigned long*)0xE000001C) = 20;+.
 
 
@@ -411,7 +418,7 @@ Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, respon
 
 \section{Porte da UART}
 
-A inicialização da UART foi feita de acordo com como o sugerido pelo manual em \cite[p.~554]{ug585}. Nesta seção será comentado as decisões tomadas na configuração inicial da UART, em particular por causa dos momentos em que o manual exigia que o desenvolvedor tomasse uma decisão.
+A inicialização da UART foi feita de acordo com o sugerido pelo manual em \cite[p.~554]{ug585}. Nesta seção será comentado as decisões tomadas na configuração inicial da UART, em particular por causa dos momentos em que o manual exigia que o desenvolvedor tomasse uma decisão.
 
 A primeira decisão que foi necessária é a de escabelecer qual será a taxa de transmissão (\emph{Baud Rate}) da UART. 
 
@@ -419,35 +426,39 @@ A primeira decisão que foi necessária é a de escabelecer qual será a taxa de tra
     \centering
     \includegraphics[width=10cm]{figuras/uart_board_rate}
     \caption{Esquemático de como é criada a taxa de transmissão.}
-	\label{tab:uart}
+	\label{fig:uart}
 \end{figure}
 
-Primeiramente foi necessário de se configurar o clock de referência da UART. Para isto, deve-se dividir o clock que vem do I/O PLL (que por sua vez deriva do PS\_CLK, que é o clock geral do sistema). Recomenda-se dividir o clock da I/O PLL de modo a se obter 50 ou 33 MHz. Assume-se que o clock vindo do I/O PLL seja de 667 MHz (sendo este valor tendo sido previamente configurado). No manual diversas vezes é usado como exemplo para o clock de referência da UART 50 MHz, portanto, arbitrariamente, escolheu-se esse valor. Logo, deve-se configurar o registrador UART\_CLK\_CTRL para dividir o clock por 13 ($667/13 = 50$).
+Primeiramente foi necessário configurar o \emph{clock} de referência da UART. Para isto, deve-se dividir o \emph{clock} que vem do I/O PLL (que por sua vez deriva do PS\_CLK, que é o \emph{clock} geral do sistema). Recomenda-se dividir o \emph{clock} da I/O PLL de modo a se obter 50 ou 33 MHz.
+O \emph{clock} da I/O PLL, por padrão, multiplica o PS\_CLK (de 33.33 MHz) por 26, resultando num \emph{clock} de 866 MHz.
+No manual diversas vezes é usado como exemplo para o \emph{clock} de referência da UART 50 MHz, portanto, arbitrariamente, escolheu-se esse valor. Logo, deve-se configurar o registrador UART\_CLK\_CTRL, responsável por configurar o \emph{clock} de entrada da UART, para dividir este \emph{clock} vindo da I/O PLL por 17 ($866/17 = 50$).
 
-Agora, com este clock estabelecido, que vamos chamar de sel\_clk (de acordo com a nomemclatura em \cite[p.~543]{ug585}), devemos calcular quanto será a taxa de transmissão.
-Após alguma pesquisa em fóruns de desenvolvedores de software básico, notei que uma taxa de transmissão de 9600 bps é o mais comum, portanto, assumindo este valor, e usando os valores de referência da tabela 19 de \cite[p.~544]{ug585}, obtém-se $CD=651$ e $BDIV=7$, sendo CD apenas uma constante para se dividir o clock, e BDIV um segundo divisor usado para sobreamostragem, organizado como mostrado na figura \ref{tab:uart}. O valor da taxa de transmissão final é calculado da seguinte forma:
+Agora, com este \emph{clock} estabelecido, que vamos chamar de sel\_clk (de acordo com a nomenclatura do manual), devemos calcular quanto será a taxa de transmissão.
+Após alguma pesquisa em fóruns de desenvolvedores de software básico, notei que uma taxa de transmissão de 9600 bps é o mais comum, portanto, assumindo este valor, a próxima etapa é configurar os dois divisores de \emph{clock} que ajustam a taxa de transmissão, como indicado na figura \ref{fig:uart}.
+
+O primeiro divisor chama-se CD (\emph{clock divider}), que configura a constante para se dividir o \emph{clock}, e BDIV um segundo divisor usado para sobreamostragem, organizado como mostrado na figura \ref{fig:uart}. O valor da taxa de transmissão final é calculado da seguinte forma:
 \begin{equation}
 	\text{taxa de transmissão} = \frac{sel\_clk}{CD \times (BDIV+1)}
 \end{equation}
 
-
+O valor padrão de BDIV é 15, portanto, fixiando-se esse valor e resolvendo a equação por CD, temos que $CD = 325$. Configurando-se estes valores nos seus respectivos registradores, obtém-se a taxa de transmissão desejada de 9600 bps.
 
 \section{Porte do Cronômetro}
 
-O porte dos cronômetros (\emph{timers}) foi relativamente simples. Os 4 principais registradores a se trabalhar são o \emph{load}, registrador onde se escreve por quantos ciclos se deve contar; o \emph{counter}, que é o cronômetro em si, sendo decrementado a cada ciclo até chegar em zero, chegando em zero o é gerada uma interrupção número 29; registrador \emph{control}, que permite configurar certos comportamentos do cronômetro, como o de ativa-lo, ativar modo cíclico, ativar interrupções e atribuir um valor para o \emph{prescale}; e finalmente o registrador \emph{interrupt status}, que, como o nome indica, permite que se leia o status das interrupções de timer. Todos os timers trabalham à metade do \emph{clock} do sistema, ou seja, usando o clock CPU\_3x2x.
+O porte dos cronômetros (\emph{timers}) foi relativamente simples. Os 4 principais registradores a se trabalhar são o \emph{load}, registrador onde se escreve por quantos ciclos se deve contar; o \emph{counter}, que é o cronômetro em si, sendo decrementado a cada ciclo até chegar em zero, chegando em zero o é gerada uma interrupção número 29; registrador \emph{control}, que permite configurar certos comportamentos do cronômetro, como o de ativa-lo, ativar modo cíclico, ativar interrupções e atribuir um valor para o \emph{prescale}; e finalmente o registrador \emph{interrupt status}, que, como o nome indica, permite que se leia o status das interrupções de timer. Todos os timers trabalham à metade do \emph{clock} do sistema, ou seja, usando o \emph{clock} CPU\_3x2x.
 
 
-O cronômetro conta baseado em ciclos, não em tempo na unidade convencional (segundos, milisegundos, etc), portanto é necessário se fazer uma conversão de unidades caso se deseje oferecer ao usuário a possibilidade de contar o tempo com unidades convencionais. A formula que converte esse valor é a seguinte \cite{technical_reference}:
+O cronômetro conta baseado em ciclos, não em tempo na unidade convencional (segundos, milisegundos, etc), portanto é necessário fazer uma conversão de unidades caso queira-se oferecer ao usuário a possibilidade de contar o tempo com unidades convencionais. A fórmula que converte esse valor é a seguinte \cite{technical_reference}:
 
 \begin{equation}
 	\Delta t = \frac{(prescaler+1) \times (load\_value)}{PERIPHCLK}
 \end{equation}
 
-Onde load\_value é o valor carregado no registrador \emph{load} para que seja contado aquele número de ciclos, prescaler é um valor de 8 bits usado para dividir o \emph{clock} do timer, fazendo com que ele conte mais lentamente, PERIPHCLK é o \emph{clock} usado nesses periféricos, que, como já dito, é a metade do \emph{clock} do sistema (CPU\_3x2x, portanto) e $\Delta t$ é o intervalo de tempo (em segundos).
+Onde load\_value é o valor carregado no registrador \emph{load} para que seja contado aquele número de ciclos, prescaler é um valor de 8 bits usado para dividir o \emph{clock} do \emph{timer}, fazendo com que ele conte mais lentamente, PERIPHCLK é o \emph{clock} usado nesses periféricos, que, como já dito, é a metade do \emph{clock} do sistema (CPU\_3x2x, portanto) e $\Delta t$ é o intervalo de tempo (em segundos).
 
 \section{Mapeamento de Memória}
 
-Por padrão, as 8 primeiras palavras da memória (ou seja, $8 \times 4 = 32$ bytes) devem possuir instruições específicas. A primeira palavra (memória posição 0) contém a primeira instrução a ser executada, e, nas 7 palavras seguintes, fica a tabela de vetores (\emph{vector table}). Como abaixo da instrução inicial há uma tabela que não se deseja executar no momento de inicialização do sistema, esta primeira instrução necessariamente é um \emph{jump} para uma outra região, para aí então se iniciar o processo de \emph{boot}. 
+Por padrão, as 8 primeiras palavras da memória (ou seja, $8 \times 4 = 32$ bytes) devem possuir instruções específicas. A primeira palavra (memória posição 0) contém a primeira instrução a ser executada, e, nas 7 palavras seguintes, fica a tabela de vetores (\emph{vector table}). Como abaixo da instrução inicial há uma tabela que não se deseja executar no momento de inicialização do sistema, esta primeira instrução necessariamente é um \emph{jump} para uma outra região, para aí então se iniciar o processo de \emph{boot}. 
 As demais 7 palavras, pertencentes à tabela de vetores possuem, similarmente, \emph{jumps} para o código onde o tratador da exceção se localiza. A primeira instrução da tabela (posição 0x4) deve conter um \emph{jump} o tratador de uma exceção do tipo undefined instruction, depois, na próxima palavra, a software interruption, prefectch abort, data abort, reserved, irq e, finalmente, fiq, nesta ordem. Vide seções \ref{sec:interrupt} e \ref{sec:operating_modes} para mais detalhes.
 
 
@@ -468,7 +479,7 @@ Desmontando-se o binário da imagem produzida na compilação do EPOS (\emph{dump})
 \end{verbatim}
 }
 
-Também foi necessário de se definir as pilhas (\emph{stacks}) do sistema, assim como reservar um espaço para a pilha dos tratadores de interrupção. O \emph{layout} escolhido segue na tabela \ref{tab:stacks}.
+Também foi necessário definir as pilhas (\emph{stacks}) do sistema, assim como reservar um espaço para a pilha dos tratadores de interrupção. O \emph{layout} escolhido segue na tabela \ref{tab:stacks}.
 \begin{table}[hb]
 	\centering
 	\begin{tabular}{ccc}
