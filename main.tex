@@ -330,7 +330,7 @@ Existem cerca de 60 interrupções de diversos modulos que podem ser roteadas para
 
 \subsection{Cronômetros (\emph{timers})}
 Cada um dos \emph{cores} possui um cronômetro privado de 32 bits e ambos \emph{cores} compartilham um cronômetro global de 64 bits. Estes cronômetros trabalham numa frequência sempre igual à metade da frequência da CPU.
-No nível de sistema (\emph{sistem-level (PS)}), há dois cronômetros triplos, cujas frequências são sempre um quarto e um sexo da frequência da CPU.
+No nível de sistema (\emph{sistem-level (PS)}), há dois cronômetros triplos, cujas frequências são sempre um quarto ou um sexo da frequência da CPU.
 
 
 
@@ -390,6 +390,9 @@ A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata d
 
 A MMU (\emph{Memory Managemed Unit}) é um componente responsável por gerenciar a memória de um sistema. É este componente o responsável por traduzir o endereçamento lógico em endereçamento físico. Uma das principais vantagens de seu uso é a possibilidade de proteção de memória.
 
+%%%%%%%%
+%		Get image from ug585 v1.7 p.79!
+%%%%%%%%
 \section{Ambiente de Desenvolvimento}
 
 O ambiente de desenvolvimento usado para o porte foi o qemu para ARM (\verb+qemu-system-arm+), para executar o EPOS num ambiente virtualizado (emulado), pois assim pode-se usar ferramentas como o GDB para a depuração do código. O uso do GDB foi fundamental para o desenvolvimento, já que com ele era possível imprimir o valor de cada registrador em um dado ponto da execução, verificar a memória, executar instruções específicas e etc. Para compilar o EPOS foi usado \emph{cross-compilers} para ARM. As flags usadas para criar um ambiente de depuração com o qemu e o GDB foram as sequintes (com cada comando feito em um terminal diferente):
@@ -435,16 +438,16 @@ A arquitetura do EPOS usa pesadamente de metaprogramação estática para, em tempo
 \begin{verbatim}
 template<bool condition, typename Then, typename Else> struct IF
 {
-	typedef Then Result;
+    typedef Then Result;
 };
 \end{verbatim}
 
-Este template, a princípio, nada mais faz do que tomar 3 parâmetros e então criar um tipo chamado Result igual ao segundo parâmetro, entretanto se nós fizemos uma especialização deste template, ele passa a se tornar útil:
+Este template, a princípio, nada mais faz do que tomar 3 parâmetros e então criar um tipo chamado Result igual ao segundo parâmetro, entretanto se nós fizemos uma especialização deste template, ele passa ser útil:
 
 \begin{verbatim}
 template<typename Then, typename Else> struct IF<false, Then, Else>
 {
-	typedef Else Result;
+    typedef Else Result;
 };
 \end{verbatim}
 
@@ -455,7 +458,9 @@ Suponha que caso a arquitetura não seja multicore, e nos traits o TSC (\emph{tim
 Isto pode ser feito usando nosso \emph{if} metaprogramado da seguinte forma:
 
 \begin{verbatim}
-class Chronometer: public IF<Traits<TSC>::enabled && !Traits<System>::multicore, TSC_Chronometer, Alarm_Chronometer>::Result
+class Chronometer: public
+IF<Traits<TSC>::enabled && !Traits<System>::multicore,
+TSC_Chronometer, Alarm_Chronometer>::Result
 {//class body};
 \end{verbatim}
 
@@ -492,34 +497,41 @@ Após estas configurações, dentre outras que o manual descreve, a UART está pront
 
 \section{Porte do \emph{timer}}
 
-%comentar por que Zynq_Timer* _channels é estátido (para ser único para todas as instâncias)
-
-%falar que o Alarm não realmente configura o timer novamente, mas sim usa o que já está rodando.
-
-Os 4 principais registradores a se trabalhar para configurar o \emph{timer} são o \emph{load}, registrador onde se escreve por quantos ciclos se deve contar; o \emph{counter}, que é o registrador que contém o atual valor contado, sendo decrementado a cada ciclo até chegar em zero, chegando em zero o é gerada uma interrupção número 29; registrador \emph{control}, que permite configurar certos comportamentos do \emph{timer}, como o de ativa-lo, ativar modo cíclico, ativar interrupções e atribuir um valor para o \emph{prescale}; e finalmente o registrador \emph{interrupt status}, que, como o nome indica, permite que se leia o status das interrupções de timer. Todos os timers trabalham à metade do \emph{clock} do sistema, ou seja, usando o \emph{clock} CPU\_3x2x.
 
 
-O \emph{timer} conta baseado em ciclos, não em tempo na unidade convencional (segundos, milisegundos, etc), portanto é necessário fazer uma conversão de unidades caso queira-se oferecer ao usuário a possibilidade de contar o tempo com unidades convencionais.
+Um \emph{timer} permite contar um certo número de ciclos, e, ao final da contagem, ele emite uma interrupção ao GIC, para que então o processador trate este evento. Entretanto note que é possível de existir mais \emph{timers} sendo usados logicamente do que \emph{timers} físicos disponíveis, significando que um mesmo \emph{timer} deve conseguir servir a mais de uma requisição simultaneamente.
 
-Entretanto note que é possível de existir mais \emph{timers} sendo usados logicamente do que \emph{timers} físicos disponíveis, significando que um mesmo \emph{timer} deve conseguir servir a mais de um processo.
+Portanto não podemos apenas configurar um \emph{timer} para contar initerruptamente até passar o tempo que desejamos, do contrário novas requisições sobreescreveriam a anterior. Para ilustrar, suponha que se queira contar por 10 segundos, como o \emph{clock} do \emph{timer} é de 333 MHz (periodo $1/333 \times 10^6$), bastaria configurar o \emph{timer} para contar por $10 \times 333 \times 10^6$ ciclos e então chamar o \emph{handler} associado a interrupção gerada quando o \emph{timer} chegar em zero.
 
-Portanto não podemos apenas configurar um \emph{timer} para contar initerruptamente até passar o tempo que desejamos, do contrário, suponha que se queira contar por 10 segundos, como o \emph{clock} do \emph{timer} é de 333 MHz, seu periodo é de $1/333 \times 10^6$, bastaria configurar o \emph{timer} para contar por $10 \times 333 \times 10^6$ ciclos e então chamar o \emph{handler} associado a interrupção gerada quando o \emph{timer} chega em zero.
-
-Agora imagine que, no cenário acima, enquanto o timer ainda está servido àquela solicitação de contagem, apareça outra solicitação, de um alarme por exemplo, e queria contar por 20 segundos. Se esta solicitação sobrescrever o registrador do \emph{timer}, a solicitação anterior não terá seu pedido atendido a tempo. Note também que o escalonador de processos também estará usando este \emph{timer}.
+Agora imagine que, no cenário acima, enquanto o \emph{timer} ainda está servido àquela solicitação de contagem, apareça outra solicitação, de um alarme por exemplo, e queria contar por 20 segundos. Se esta solicitação sobrescrever o registrador de configuração do \emph{timer}, a solicitação anterior não terá seu pedido atendido a tempo. Note também que o escalonador de processos também estará usando este \emph{timer}.
 
 Para resolver este problema, na arquitetura do EPOS existe o conceito de ticks (algo parecido com o que se faz no Linux), onde se configura um \emph{timer} para gerar interrupções em um intervalo regular, intervalo este que deve ser pequeno o suficiente para poder atender a demanda de contagens de pequenos valores, assim como não ser pequeno demais ao ponto de gastar mais processamento tratando as interrupções geradas pelo \emph{timer} do que servindo à outras funções. Assim, cada objeto que instancia (ou usa) um \emph{timer}, como o Alarm, Scheduler e Chronometer, nunca realmente tocam em algum registrador do \emph{timer} (portanto esses componentes são independentes de arquitetura), e, no lugar disso, computam quantos ticks, isto é, quantas interrupções de \emph{timer} aconteceram.
 
-Para exemplificar o funcionamento destes componentes, pegarei o escalonador de processos. No construtor do escalonador, é enviado como parâmetro o periodo de escalonamento, ou seja, quanto tempo (no máximo) uma thread pode executar antes de ser escalonada. Para se saber quantos ticks devem ser contados antes de se escalonar um processo, basta dividir a frequência em que os ticks incrementam, pela frequência de escalonamento. Por exemplo, se o timer gera uma interrupção a cada 1 milisegundo (1000 Hz), e o escalonador escalona um processo a cada 10 milisegundos (100 Hz), o número de ticks a se contar é $1000/100 = 10$ ticks. Estes são os valores usados na implementação também.
-%%%%%%%%%%% << continue from here.
-A fórmula que converte esse valor é a seguinte \cite{technical_reference}:
+Para exemplificar o funcionamento destes componentes, tomemos o escalonador de processos. No construtor do escalonador, é enviado como parâmetro o periodo de escalonamento, ou seja, quanto tempo (no máximo) uma thread pode executar antes de ser escalonada. Para se saber quantos ticks devem ser contados antes de se escalonar um processo, basta dividir a frequência em que os ticks incrementam, pela frequência de escalonamento. Por exemplo, se o timer gera uma interrupção a cada 1 milisegundo (1000 Hz), e o escalonador escalona um processo a cada 10 milisegundos (100 Hz), o número de ticks a se contar é $1000/100 = 10$ ticks. Estes são os valores usados na implementação também.
 
+No caso do Alarm em específico, internamente há uma fila com todas as requisições de alarme, ordenado do menor tick ao maior. Quando ocorre uma interrupção de timer, é chamado primeiramente o \emph{handler} que gerencia esta fila, e, caso um alarme desta fila já tenha esperado os ticks que requisitou, então o \emph{handler} desse alarme é chamado (este \emph{handler} é definido pelo usuário que instanciou o alarme).
+
+
+O construtor do \verb+Zynq_Timer+ recebe como parâmetro a frequência que o contador deve contar, assim como o \emph{handler} que deve ser chamado quando esta contagem terminar (isto é, a função chamada quando acontecer uma interrupção devido ao timer ter chego a zero), e um número chamado channel, que serve para demultiplexar qual handler deve ser chamado.
+
+A classe \verb+Zynq_Timer+ possui um atributo estático (e portanto único para todas as instâncias) definido como \verb+Zynq_Timer*+ \verb+_channels[CHANNELS]+, onde \verb+CHANNELS+ é uma constante com o número de diferentes classes usando o \emph{timer} (Scheduler e Alarm). Este vetor é necessário pois, quando uma interrupção de \emph{timer} acontece e o \emph{handler} do \emph{timer} é chamado, o \emph{handler} pode iterar sobre ele, chamando todos os respectivos \emph{handlers} daquelas classes.
+
+
+Os 4 principais registradores a se trabalhar para configurar o \emph{timer} são o \verb+load+, registrador onde se escreve por quantos ciclos se deve contar; o \emph+counter+, que é o registrador que contém o atual valor contado, sendo decrementado a cada ciclo até chegar em zero, chegando em zero o é gerada uma interrupção número 29; registrador \emph+control+, que permite configurar certos comportamentos do \emph{timer}, como o de ativa-lo, ativar modo cíclico, ativar interrupções e atribuir um valor para o \emph{prescale}; e finalmente o registrador \emph+interrupt status+, que, como o nome indica, permite que se leia o status das interrupções de timer. Todos os timers trabalham à metade do \emph{clock} do sistema, ou seja, usando o \emph{clock} CPU\_3x2x.
+
+Durante a inicialização do sistema, o \emph{timer} é configurado para gerar interrupções periodicamente, e esta configuração não é alterada durante a execução da aplicação. Como o construtor do \verb+Zynq_Timer+ recebe uma frequência como parâmetro, é necessário se converter esta frequência para um número de ciclos a se contar. Para isto, é necessário se levar em conta a frequência com que o contador é decrementado, para então se definir um valor a ser decrementado periodicamente de modo a fornecer a frequência desejada.
+
+Como sabemos que o \emph{clock} ao qual o \emph{timer} está submetido é metade do \emph{clock} do sistema, e que antes dele chegar ao contador, este mesmo clock é dividido por um divisor chamado \emph{prescaler} (que divide pelo valor configurado nele mais 1), podemos dizer que:
+\[
+	COUNTER\_CLOCK\_FREQUENCY = \frac{SYSTEM\_CLOCK}{2 \times (PRESCALER+1)}
+\]
+Logo, usando a mesma linha de racioncínio exposta no exemplo de cálculo de ticks, temos que o valor a ser carregado no \verb+load_register+ (que será chamado de \verb+load_value+), sendo a frequência desejada F, é:
 \begin{equation}
-	\Delta t = \frac{(prescaler+1) \times (load\_value)}{PERIPHCLK}
+	\text{load\_value} = \frac{SYSTEM\_CLOCK}{2 \times (PRESCALER+1) \times F}
 \end{equation}
 
-Onde load\_value é o valor carregado no registrador \emph{load} para que seja contado aquele número de ciclos, prescaler é um valor de 8 bits usado para dividir o \emph{clock} do \emph{timer}, fazendo com que ele conte mais lentamente, PERIPHCLK é o \emph{clock} usado nesses periféricos, que, como já dito, é a metade do \emph{clock} do sistema (CPU\_3x2x, portanto) e $\Delta t$ é o intervalo de tempo (em segundos).
 
-O construtor do Zynq\_Timer recebe como parâmetro a frequência que o contador deve contar, assim como o \emph{handler} que deve ser chamado quando esta contagem terminar (isto é, a função chamada quando acontecer uma interrupção por o timer ter chegado a zero), e um número chamado channel, que serve para demultiplexar qual handler deve ser chamado (isto será melhor explicado mais a frente).
+Precisamos agora definir o prescaler. Definimos ele como a razão entre o \emph{clock} do \emph{timer} pela frequência desejada ($\frac{\text{clock}}{2 \times F}$). Há a premissa de que a frequência desejada não será maior que a do \emph{clock} do \emph{timer}, pois é impossível contar mais rápido que isto. Normalmente esta razão ($\frac{\text{clock}}{2 \times F}$) será um número maior que 255, já que o clock costuma ser muito mais rápido, e como o campo onde se registra o valor do prescaler possui apenas 8 bits, frequentemente o prescaler será 255.
 
 
 
@@ -553,19 +565,19 @@ Também foi necessário definir as pilhas (\emph{stacks}) do sistema, assim como r
 		\hline \hline
 		Pilha & Endereço base & Tamanho máximo (bytes)\\[0.5ex]
 		\hline
-		Sistema		& \verb+0x0010c060+ & 49248\\
-		Irq			& \verb+0x0010e060+ & 8192\\
-		Supervisor	& \verb+0x0010e860+ & 2048\\
-		Abort		& \verb+0x0010ec60+ & 1024\\
-		Fiq			& \verb+0x0010f060+ & 1024\\
-		Undefined	& \verb+0x0010f460+ & 1024\\[1ex]
+		Supervisor		& \verb+0x00100000+ & 983040\\
+		Irq			& \verb+0x00100040+ & 64\\
+		System			& \verb+0x00100080+ & 64\\
+		Abort			& \verb+0x001000c0+ & 64\\
+		Fiq			& \verb+0x00100100+ & 64\\
+		Undefined		& \verb+0x00100140+ & 64\\[1ex]
 		\hline
 	\end{tabular}
 	\caption{Pilhas do sistema com seus tamanhos e posições.}
 	\label{tab:stacks}
 \end{table}
 
-Lembrando que pilhas, num sistema operacional, tradicionalmente crescem em direção à posições menores da memória, por isto que, por exemplo, a pilha Supervisor possui 2048 bytes, já que $\texttt{0x10e860}-\texttt{0x10e060} = 800_{16} = 2048_{10}$. A pilha do usuário, portanto, localiza-se na última posição da memória (512 MB neste caso) e cresce para ``baixo'' a partir de lá.
+Lembrando que pilhas, num sistema operacional, tradicionalmente crescem em direção à posições menores da memória, por isto que, por exemplo, a pilha Irq possui 64 bytes, já que $\texttt{0x100040}-\texttt{0x100000} = 40_{16} = 64_{10}$. A pilha do usuário, portanto, localiza-se na última posição da memória (512 MB neste caso) e cresce para ``baixo'' (posições menores de memória) a partir de lá.
 
 %Falar da heap.
 %Memory top/base, app_code, app_data...
