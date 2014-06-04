@@ -124,7 +124,7 @@
 
 \chapter{Introdução}
 
-O presente trabalho visa descrever como foi feito o porte do sistema operacional EPOS para a plataforma Zedboard, bem como comentar sobre as decisões tomadas e problemas enfrentados.
+O presente trabalho visa descrever como foi feito o porte\footnote{Porte é um estrangeirismo da palavra \emph{port}, que, no âmbito da computação, significa o ato de fazer um mesmo programa/sistema/SO funcionar em diferentes ambientes. Por exemplo, fazer um software que antes só funcionava no Linux passar a funcionar em um outro SO (sistema operacional) pode ser considerado um porte. Uma palavra alternativa que poderia ser usada é ``suporte'', entretanto acredito que esta palavra não expresse apropriadamente o que foi feito, já que essa palavra normalmente é associada com um serviço pago de assistência técnica, e o próprio fraseamento do que foi feito se tornaria de mais difícil compreensão e prolixo com esta palavra.} do sistema operacional EPOS para a plataforma Zedboard, bem como comentar sobre as decisões tomadas e problemas enfrentados.
 
 \section{Motivação}
 EPOS é um sistema operacional que visa reduzir o custo de produção das aplicações embarcadas provendo um ambiente onde a aplicação do desenvolvedor possa rodar sem que ele tenha que lidar com configurações de baixo nível. Sendo assim é importante que o EPOS seja portado para um grande número de plataformas, do contrário sua utilidade prática seria prejudicada.
@@ -404,6 +404,9 @@ O hardware real também estava disponível, e foi usado quando quando o qemu não p
 
 \chapter{Porte}
 
+% Eu poderia descrever como eu tenho que incluir cada classe feita em ./include/system/types.h, opções de traits, etc..
+
+
 Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões e dificuldades encontradas.
 
 Antes de entrar nas especificidades de cada componente, é interessante colocar aqui alguns conceitos comuns que são usados em cada mediador.
@@ -411,10 +414,52 @@ Antes de entrar nas especificidades de cada componente, é interessante colocar a
 A maneira usada para se comunicar, configurar e ler o estado de um dado componente de hardware é através da leitura e/ou escrita em registradores mapeados em memória. Um registrador mapeado em memória basicamente é uma região fixa da memória, onde uma escrita naquela posição indica uma escrita no registrador lá mapeado.
 Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, responsável por indicar quantos ciclos\footnote{Na realidade é o número de baud\_samples que se passaram.} a UART deve esperar um novo caractere chegar antes de emitir uma interrupção de \emph{timeout}. Este registrador está mapeado na posição de memória 0xE000001C para a UART0. Portanto, para configurar que o número de ciclos esperado seja de 20, basta escrever este número naquela posição. Uma maneira de fazer esta escrita, por exemplo, em C/C++, é: \verb+*((unsigned long*)0xE000001C) = 20;+.
 
-
+%\section{memory map}
 
 %\section{Boot}
 
+\section{Traits}
+
+Existem 4 arquivos traits.h que devem ser levados em consideração em um porte, dois deles devem ser completamente reescritos. Os arquivos \verb+./include/traits.h+ e \verb+/include/system/traits.h+ (onde '.' é a pasta raiz do código) possuem configurações gerais do EPOS, que, a princípio, devem ser independentes de arquitetura. Na prática há alguns pequenos ajustes que devem ser feitos nesses arquivos, pois é lá que se define, por exemplo, se o EPOS trabalhará em um processador \emph{multicore}, se utilizará \emph{scratchpad}, quais componentes estarão em modo de depuração e etc; entretanto isto se resume a trocar o valor de algumas variáveis de \emph{true} para \emph{false} ou o contrário.
+
+Os outros dois arquivos são \verb+./include/mach/zynq/traits.h+ e \verb+./include/arch/armv7/traits.h+. Essa divisão é necessária pois, como dito anteriormente, é possível de um mesmo processador estar em diferentes \emph{machines}, e, caso seja necessário fazer um porte para esta plataforma, bastaria modificar os arquivos da pasta \emph{mach}, deixando os da pasta \emph{arch} praticamente intáctos, o que facilita muito novos portes.
+
+Em \verb+./include/arch/armv7/traits.h+ trata das opções específicas do processador, portanto é lá que opções como \emph{endianess}, velocidade de \emph{clock}, número de \emph{cores}, tamanho da heap e stacks, bem como outras opções pertinentes ao mapeamento de memória e opções da MMU podem ser configuradas.
+
+No arquivo de traits da \emph{machine}, ficam as opções de configuração de componentes como a UART, controlador de interrupções, \emph{timer}, e qualquer componente de interfaceamento externo à placa (rede, por exemplo). Componentes podem ser facilmente desativados nestas opções.
+
+\section{Metaprogramação estática}
+
+A arquitetura do EPOS usa pesadamente de metaprogramação estática para, em tempo de compilação, selecionar a arquitetura, bem como cada componente que será ou não utilizado. Por exemplo, podemos definir um \emph{if} estático para selecionar de qual classe a classe Chronometer irá derivar. Primeiramente a definição do \emph{if}:
+
+\begin{verbatim}
+template<bool condition, typename Then, typename Else> struct IF
+{
+	typedef Then Result;
+};
+\end{verbatim}
+
+Este template, a princípio, nada mais faz do que tomar 3 parâmetros e então criar um tipo chamado Result igual ao segundo parâmetro, entretanto se nós fizemos uma especialização deste template, ele passa a se tornar útil:
+
+\begin{verbatim}
+template<typename Then, typename Else> struct IF<false, Then, Else>
+{
+	typedef Else Result;
+};
+\end{verbatim}
+
+Com esta especialização, toda vez que o primeiro parâmetro resolver-se como falso, Result será definido como o terceiro parâmetro. Temos, portanto, um \emph{if} metaprogramado funcional, agora voltemos ao exemplo do chronometro.
+
+Suponha que caso a arquitetura não seja multicore, e nos traits o TSC (\emph{time stamp clock}) esteja ativo, então deseja-se que Chronometer derive de TSC\_Chronometer, do contrário de Alarm\_Chronometer.
+
+Isto pode ser feito usando nosso \emph{if} metaprogramado da seguinte forma:
+
+\begin{verbatim}
+class Chronometer: public IF<Traits<TSC>::enabled && !Traits<System>::multicore, TSC_Chronometer, Alarm_Chronometer>::Result
+{//class body};
+\end{verbatim}
+
+Deste modo, Chronomometer derivará de IF::Result, que será resolvido como TSC\_Chronometer ou Alarm\_Chronometer. Note que esse exemplo também mostra um uso do Traits, onde para descobrir se o TSC está ativo, bastou ler a constante Traits<TSC>::enabled, e para saber se o sistema é multicore bastou ler Traits<System>::multicore. Todo esse processamento causa zero \emph{overhead} em tempo de execução.
 
 \section{Porte da UART}
 
@@ -443,18 +488,40 @@ O primeiro divisor chama-se CD (\emph{clock divider}), que configura a constante
 
 O valor padrão de BDIV é 15, portanto, fixiando-se esse valor e resolvendo a equação por CD, temos que $CD = 325$. Configurando-se estes valores nos seus respectivos registradores, obtém-se a taxa de transmissão desejada de 9600 bps.
 
-\section{Porte do Cronômetro}
+Após estas configurações, dentre outras que o manual descreve, a UART está pronta para ser usada. Os dois principais métodos usados da UART são o put e o get, o primeiro escreve um caractere na saída serial, sendo que este pode ser lido, por exemplo através de uma entrada USB, para imprimir estes caracteres numa tela; algo muito útil para depuração.
 
-O porte dos cronômetros (\emph{timers}) foi relativamente simples. Os 4 principais registradores a se trabalhar são o \emph{load}, registrador onde se escreve por quantos ciclos se deve contar; o \emph{counter}, que é o cronômetro em si, sendo decrementado a cada ciclo até chegar em zero, chegando em zero o é gerada uma interrupção número 29; registrador \emph{control}, que permite configurar certos comportamentos do cronômetro, como o de ativa-lo, ativar modo cíclico, ativar interrupções e atribuir um valor para o \emph{prescale}; e finalmente o registrador \emph{interrupt status}, que, como o nome indica, permite que se leia o status das interrupções de timer. Todos os timers trabalham à metade do \emph{clock} do sistema, ou seja, usando o \emph{clock} CPU\_3x2x.
+\section{Porte do \emph{timer}}
+
+%comentar por que Zynq_Timer* _channels é estátido (para ser único para todas as instâncias)
+
+%falar que o Alarm não realmente configura o timer novamente, mas sim usa o que já está rodando.
+
+Os 4 principais registradores a se trabalhar para configurar o \emph{timer} são o \emph{load}, registrador onde se escreve por quantos ciclos se deve contar; o \emph{counter}, que é o registrador que contém o atual valor contado, sendo decrementado a cada ciclo até chegar em zero, chegando em zero o é gerada uma interrupção número 29; registrador \emph{control}, que permite configurar certos comportamentos do \emph{timer}, como o de ativa-lo, ativar modo cíclico, ativar interrupções e atribuir um valor para o \emph{prescale}; e finalmente o registrador \emph{interrupt status}, que, como o nome indica, permite que se leia o status das interrupções de timer. Todos os timers trabalham à metade do \emph{clock} do sistema, ou seja, usando o \emph{clock} CPU\_3x2x.
 
 
-O cronômetro conta baseado em ciclos, não em tempo na unidade convencional (segundos, milisegundos, etc), portanto é necessário fazer uma conversão de unidades caso queira-se oferecer ao usuário a possibilidade de contar o tempo com unidades convencionais. A fórmula que converte esse valor é a seguinte \cite{technical_reference}:
+O \emph{timer} conta baseado em ciclos, não em tempo na unidade convencional (segundos, milisegundos, etc), portanto é necessário fazer uma conversão de unidades caso queira-se oferecer ao usuário a possibilidade de contar o tempo com unidades convencionais.
+
+Entretanto note que é possível de existir mais \emph{timers} sendo usados logicamente do que \emph{timers} físicos disponíveis, significando que um mesmo \emph{timer} deve conseguir servir a mais de um processo.
+
+Portanto não podemos apenas configurar um \emph{timer} para contar initerruptamente até passar o tempo que desejamos, do contrário, suponha que se queira contar por 10 segundos, como o \emph{clock} do \emph{timer} é de 333 MHz, seu periodo é de $1/333 \times 10^6$, bastaria configurar o \emph{timer} para contar por $10 \times 333 \times 10^6$ ciclos e então chamar o \emph{handler} associado a interrupção gerada quando o \emph{timer} chega em zero.
+
+Agora imagine que, no cenário acima, enquanto o timer ainda está servido àquela solicitação de contagem, apareça outra solicitação, de um alarme por exemplo, e queria contar por 20 segundos. Se esta solicitação sobrescrever o registrador do \emph{timer}, a solicitação anterior não terá seu pedido atendido a tempo. Note também que o escalonador de processos também estará usando este \emph{timer}.
+
+Para resolver este problema, na arquitetura do EPOS existe o conceito de ticks (algo parecido com o que se faz no Linux), onde se configura um \emph{timer} para gerar interrupções em um intervalo regular, intervalo este que deve ser pequeno o suficiente para poder atender a demanda de contagens de pequenos valores, assim como não ser pequeno demais ao ponto de gastar mais processamento tratando as interrupções geradas pelo \emph{timer} do que servindo à outras funções. Assim, cada objeto que instancia (ou usa) um \emph{timer}, como o Alarm, Scheduler e Chronometer, nunca realmente tocam em algum registrador do \emph{timer} (portanto esses componentes são independentes de arquitetura), e, no lugar disso, computam quantos ticks, isto é, quantas interrupções de \emph{timer} aconteceram.
+
+Para exemplificar o funcionamento destes componentes, pegarei o escalonador de processos. No construtor do escalonador, é enviado como parâmetro o periodo de escalonamento, ou seja, quanto tempo (no máximo) uma thread pode executar antes de ser escalonada. Para se saber quantos ticks devem ser contados antes de se escalonar um processo, basta dividir a frequência em que os ticks incrementam, pela frequência de escalonamento. Por exemplo, se o timer gera uma interrupção a cada 1 milisegundo (1000 Hz), e o escalonador escalona um processo a cada 10 milisegundos (100 Hz), o número de ticks a se contar é $1000/100 = 10$ ticks. Estes são os valores usados na implementação também.
+%%%%%%%%%%% << continue from here.
+A fórmula que converte esse valor é a seguinte \cite{technical_reference}:
 
 \begin{equation}
 	\Delta t = \frac{(prescaler+1) \times (load\_value)}{PERIPHCLK}
 \end{equation}
 
 Onde load\_value é o valor carregado no registrador \emph{load} para que seja contado aquele número de ciclos, prescaler é um valor de 8 bits usado para dividir o \emph{clock} do \emph{timer}, fazendo com que ele conte mais lentamente, PERIPHCLK é o \emph{clock} usado nesses periféricos, que, como já dito, é a metade do \emph{clock} do sistema (CPU\_3x2x, portanto) e $\Delta t$ é o intervalo de tempo (em segundos).
+
+O construtor do Zynq\_Timer recebe como parâmetro a frequência que o contador deve contar, assim como o \emph{handler} que deve ser chamado quando esta contagem terminar (isto é, a função chamada quando acontecer uma interrupção por o timer ter chegado a zero), e um número chamado channel, que serve para demultiplexar qual handler deve ser chamado (isto será melhor explicado mais a frente).
+
+
 
 \section{Mapeamento de Memória}
 
@@ -501,6 +568,9 @@ Também foi necessário definir as pilhas (\emph{stacks}) do sistema, assim como r
 Lembrando que pilhas, num sistema operacional, tradicionalmente crescem em direção à posições menores da memória, por isto que, por exemplo, a pilha Supervisor possui 2048 bytes, já que $\texttt{0x10e860}-\texttt{0x10e060} = 800_{16} = 2048_{10}$. A pilha do usuário, portanto, localiza-se na última posição da memória (512 MB neste caso) e cresce para ``baixo'' a partir de lá.
 
 %Falar da heap.
+%Memory top/base, app_code, app_data...
+
+\section{Porte do Controlador de Interrupções}
 
 \bibliographystyle{ufscThesis/ufsc-alf}
 \bibliography{references}
