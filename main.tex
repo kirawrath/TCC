@@ -328,9 +328,9 @@ Existem cerca de 60 interrupções de diversos modulos que podem ser roteadas para
 \end{figure}
 
 
-\subsection{Cronômetros (\emph{timers})}
-Cada um dos \emph{cores} possui um cronômetro privado de 32 bits e ambos \emph{cores} compartilham um cronômetro global de 64 bits. Estes cronômetros trabalham numa frequência sempre igual à metade da frequência da CPU.
-No nível de sistema (\emph{sistem-level (PS)}), há dois cronômetros triplos, cujas frequências são sempre um quarto ou um sexo da frequência da CPU.
+\subsection{(\emph{timers})}
+Cada um dos \emph{cores} possui um \emph{timer} privado de 32 bits e ambos \emph{cores} compartilham um \emph{timer} global de 64 bits. Estes \emph{timers} trabalham numa frequência sempre igual à metade da frequência da CPU.
+No nível de sistema (\emph{sistem-level (PS)}), há dois \emph{timers} triplos, cujas frequências são sempre um quarto ou um sexo da frequência da CPU.
 
 
 
@@ -581,6 +581,28 @@ Lembrando que pilhas, num sistema operacional, tradicionalmente crescem em direç
 
 %Falar da heap.
 %Memory top/base, app_code, app_data...
+
+
+%%>>>>>continue from here
+Restante do mapeamento de memória:
+\ref{tab:mem}.
+\begin{table}[hb]
+	\centering
+	\begin{tabular}{ccc}
+		\hline \hline
+		Dado & Endereço base & Tamanho máximo\\[0.5ex]
+		\hline
+		Tabela da MMU		& \verb+0x00100144+ & 5242556 bytes\\
+		APP\_DATA		& \verb+0x00600000+ & 1mb\\
+		SYS\_HEAP		& \verb+0x00700000+ & 32mb\\
+		APP\_HEAP		& \verb+0x02700000+ & \\
+		APP\_STACK		& \verb+0x1ffffffc+ & \\[1ex]
+		\hline
+	\end{tabular}
+	\caption{Pilhas do sistema com seus tamanhos e posições.}
+	\label{tab:stacks}
+\end{table}
+
 
 \section{Porte do Controlador de Interrupções}
 
