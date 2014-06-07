@@ -544,6 +544,7 @@ As demais 7 palavras, pertencentes à tabela de vetores possuem, similarmente, \e
 %desmontamento do binário da imagem do EPOS
 Desmontando-se o binário da imagem produzida na compilação do EPOS (\emph{dump}), deve-se obter uma saída semelhante a esta exemplificada abaixo em seus primeiros 32 bytes:
 
+\label{dump}
 \hspace*{-1.8cm}\vbox{
 \begin{verbatim}
 	00000000 <_vector_table>:
@@ -605,6 +606,85 @@ Restante do mapeamento de memória:
 
 
 \section{Porte do Controlador de Interrupções}
+
+%falar sobre os handlers, qual a sequência de chamadas de função
+%int_vector
+%os diferentes tipos de interrupção (abort, prefetch...), dar exemplos de quando são gerados
+%ICCIAR and ICCEOI register
+%spurious interruption 1023
+%explicar approach usado em exception.cc
+
+Para se usar o controlador de interrupções (que será referenciado como GIC no restante desta seção, de \emph{Generic Interrupt Controller}), é necessário antes inicializar o distribuidor de interrupções e as interfaces dos processadores.
+
+É no distribuidor que é determinada a prioridade de cada interrupção, e onde é decidido se determinada interrupção deve ou não ser encaminhada para a interface de um determinado processador. Todas as interrupções passam por ele.
+
+A interface dos processadores é por onde os processadores se comunicam com o GIC. Nela o processador confirmar que recebeu a interrupção (\emph{acknowledge}), indicar que terminou de tratar a mesma, definir prioridades entre diferentes interrupções, indicar uma política de preempção de interrupções, ou mesmo desligar esta interface. Como o GIC é dividido logicamente é ilutrado na imagem \ref{img:gic}
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=8cm]{figuras/gic}
+    \caption{Divisão lógica do GIC.}
+    \label{img:gic}
+\end{figure}
+
+\subsection{Inicialização}
+
+Na inicialização do distribuidor, através dos registradores mapeados em memória de configuração do mesmo, é definido, para cada uma das possíveis interrupções, se elas são \emph{level-sensitive} ou \emph{edge-triggered}.
+Em seguida configura-se a prioridade de cada interrupção. A princípio todas as interrupções foram definidas como tendo a mesma prioridade, mas isto é configurável caso necessário.
+É configurado então o processador-alvo de cada interrupção, isto é, para quais interfaces de processador uma determinada interrupção será encaminhada. Finalmente então são ativadas as interrupções.
+
+A inicialização da interface do processador é mais simples. Primeiro se configura a máscara de prioridade da CPU, isto é, qual é o nível de prioridade mínimo que uma interrupção precisa ter para interromper aquele processador. Na implementação esta máscara está desativada. Depois configura-se a política grupos de preempção. No GIC é possível separar interrupções em grupos de preempção, onde se define se determinado grupo pode preemptar determinado outro grupo. Todas as interrupções foram colocadas no mesmo grupo e interrupções podem ser preemptadas.
+
+Adicionalmente a estas configurações, é possível de mascaras as interrupções FIQ e IRQ através do CPSR (\emph{Current Program Status Register}), alterando-se os bits 6 e 7 dele, para mascarar interrupções FIQ e IRQ, respectivamente. Normalmente é o que é feito quando é necessário mascaras as interrupções, enquanto se mantém as configurações do GIC.
+
+\subsection{Fluxo de execução ao se receber uma interrupção}
+
+O processador, ao se receber uma interrupção, (e, portanto as interrupções estão ativas e não mascaradas pela interface ou pelo CPSR), o processador para a execução do código que estava executando e então executa a instrução contida na tabela de vetores (mostrada na página \pageref) correspondente ao tipo de interrupção recebida. Esta instrução é um jump para um tratador (\emph{handler}) daquele tipo de interrupção.
+
+O principal tratador é o tratador de interrupções IRQ (\verb+irc_handler+), sendo que este precisa ser discutido com mais profundidade. Abaixo segue o código deste tratador:
+
+\begin{verbatim}
+ 43 void _irq_handler() {
+ 44   ASMV(
+ 45   // A few definitions
+ 46   ".equ ARM_MODE_FIQ,      0x11 \n"
+ 47   ".equ ARM_MODE_IRQ,      0x12 \n"
+ 48   ".equ ARM_MODE_SVC,      0x13 \n"
+ 49   ".equ IRQ_BIT,           0x80 \n"
+ 50   ".equ FIQ_BIT,           0x40 \n"
+ 51 
+ 52   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT \n" // go to SVC
+ 53   // save current context (lr, sp and spsr are banked registers)
+ 54   "stmfd sp!, {r0-r3,r12,lr,pc}\n"
+ 55 
+ 56   "msr cpsr_c, #ARM_MODE_IRQ | IRQ_BIT | FIQ_BIT\n" //go to IRQ
+ 57 
+ 58   "sub r0, lr, #4 \n" // return from irq addr
+ 59   "mrs r1, spsr   \n" // pass irq_spsr to svc r1
+ 60 
+ 61   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT\n"//go back to SVC
+ 62   "add r2, sp, #24 \n"  // sp+24 is the position of the saved pc
+ 63   // save address to return from interrupt into the pc position
+ 64   // to retore context later on.
+ 65   "str r0, [r2] \n" 
+ 66   "stmfd sp!, {r1} \n"   // save irq-spsr
+ 67       
+ 68   );    
+ 69   
+ 70     
+ 71   IC::int_handler();
+ 72     
+ 73   ASMV(        
+ 74   "ldmfd sp!, {r0}              \n"
+ 75   "msr spsr_cfxs, r0 \n" // restore IRQ's spsr value to SVC's spsr
+ 76             
+ 77   "ldmfd sp!, {r0-r3,r12,lr,pc}^ \n" // restore context
+ 78   //the ^ in the end of the above instruction makes the 
+ 79   //irq_spsr to be restored into svc_cpsr
+ 80   );
+ 81 }
+
+\end{verbatim}
 
 \bibliographystyle{ufscThesis/ufsc-alf}
 \bibliography{references}
