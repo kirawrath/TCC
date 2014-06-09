@@ -223,32 +223,6 @@ Como j� citado, o Zynq 7000 possui um processador \emph{dual core}Cortex A9, c
 \subsection{OCM} O \emph{On-chip Memory} � uma pequena mem�ria de 256KB de RAM que fica pr�xima ao processador, e portanto tem um acesso mais r�pido. O OCM pode ser mapeado nos primeiros 256KB do espa�o de endere�amento, ou nos �ltimos 256KB do espa�o de endere�amento \cite{ug585}, como mostrado na tabela \ref{tab.memlayout}.
 
 
-\subsection{Layout de mem�ria} 
-A tabela abaixo � uma simplifica��o do layout de mem�ria do Zynq\footnote{Uma tabela mais completa e detalhada pode ser encontrada em UG585 (v1.6.1), p. 115.}.
-
-\begin{table}[ht]
-
-\centering
-\begin{tabular}{ccp{5cm}}
-\hline\hline                        %inserts double horizontal lines
-Intervalo de endere�o  & Regi�o mapeada & Coment�rios\\ [0.5ex] % inserts table 
-%heading
-\hline                  % inserts single horizontal line
-\verb+0x0000_0000 - 0x0003_FFFF+ & OCM & \parbox{5cm}{OCM quando mapeada em \\mem�ria baixa (padr�o).} \\
-\verb+0x0010_0000 - 0x3FFF_FFFF+ & DDR &  \\
-\verb+0x4000_0000 - 0xFFFB_FFFF+ & V�rias & \parbox{5cm}{Registradores mapeados em \\mem�ria ou �reas reservadas.} \\
-\verb+0xFFFC_0000 - 0xFFFF_FFFF+ & OCM & \parbox{5cm}{OCM quando mapeada em \\mem�ria alta.}\\ [1ex]
-\hline %inserts single line
-\end{tabular}
-\caption{Mapeamento de mem�ria.}
-\label{tab.memlayout} % is used to refer this table in the text
-\end{table}
-
-A parte que nos interessa � saber que a RAM come�a em \verb+0x0010_0000+ (1MB) e termina em \verb+0x3FFF_FFFF+ (1GB). � �bvio que apesar do mapeamento ir at� 1GB, o sistema est� limitado a quanto de mem�ria f�sica existe, que no caso s�o 512MB.
-
-
-
-
 \subsection{Modos de Opera��o}
 \label{sec:operating_modes}
 A arquitetura ARMv7 conta com 9 modos de opera��o (7 por padr�o, mais 2 com extens�es habilidadas), sendo que o �nico modo n�o privilegiado � o modo de usu�rio, os demais modos padr�o possuem o mesmo privil�gio dentro do sistema. A principal diferen�a entre um modo e outro � que cada modo conta com um certo subconjunto privado de registradores, visiveis somente no modo em vig�ncia, detalhes sobre estes registradores seguem na se��o seguinte. A tabela abaixo ilustra quais s�o os modos de opera��o dispon�veis \cite[p.~1139]{armarm}.
@@ -327,8 +301,34 @@ Existem cerca de 60 interrup��es de diversos modulos que podem ser roteadas 
     \caption{Diagrama de blocos dos \emph{clocks} dispon�veis no Zynq. Note os \emph{clocks} da tabela \ref{tab:clocks} no canto superior direito da imagem.}
 \end{figure}
 
+Há também as interrupções\footnote{Na nomenclatura do manual, usa-se o termo exceção para os 6 diferentes tipos de interrupção, e de interrupção os diferentes tipos de interrupção IRQ ou FIQ (as categorias de interrupção descritas acima são do tipo IRQ). Durante este trabalho preferiu-se usar apenas o nome interrupção, pois assim não há ambiguidade com a palavra exceção no contexto de linguagens de programação.} geradas por alguma exceção, i.e. algum evento inesperado no fluxo de execução. Além das interrupções IRQ (contempladas acima) existem mais 5 tipos interrupções que devem ser contempladas. São elas:
 
-\subsection{(\emph{timers})}
+\textbf{FIQ \emph{Fast Interrupt}:} O modo FIQ possui um número maior de registradores banqueados que os demais modos (R8 até R13, além do SP, LR e SPSR), fazendo com que não seja necessário fazer troca de contexto. FIQs também tem mais alta prioridade que qualquer IRQ, pontanto este tipo de interrupção é apropriado para aplicações de tempo real de usuário único. Se multiplas aplicações tempo real usarem FIQ, pode haver conflitos de interesse que podem fazer um processo perder um \emph{deadline} \cite[p.~66]{armarm}.
+
+%FIQ mode is designed for efficient use by a single owner, using R8_fiq – R13_fiq as global variables. 
+%In addition, unlike IRQs, FIQs are not disabled by other exceptions (apart from reset), making them 
+%the preferred type for real time interrupts, when other exceptions are being used routinely, such as 
+%virtual memory or instruction emulation. IRQs may be disabled for unacceptably long periods of time 
+%while these needs are being serviced.
+%However, if more than one real-time interrupt source is required, there is a conflict of interest. The 
+%new mechanism allows multiple FIQ sources and minimizes the period with FIQs disabled, greatly 
+%reducing the interrupt latency penalty. The FIQ mode registers can be allocated to the highest priority 
+%FIQ as a single owner
+%ARM ARM p. 66.
+
+\textbf{Instrução não definida \emph{Undefined Instruction}:} 
+Há duas situações que geram esta interrupção: Quando se executa instruções de coprocessador que não são reconhecidas por este, ou quando se executa instruções que não possuem significado para o processador \cite[p.~36]{armarm}. Normalmente este tipo de interrupção acontecerá quando o processador estiver lendo e tentando executar lixo de memória.
+
+
+\textbf{\emph{Prefetch Abort: }} Interrupção que leva ao modo Abort. Este tipo de interrupção é sinalizado pelo sistema de memória (MMU). Através da MMU, é possível de se marcar certas regiões de memória como não executáveis; isto é importante de se fazer em regiões de memória que possuem dados sensíveis, de modo que quando o processador tentar ler aquela área para executar num futuro próximo, a MMU envia um sinal invalidando aquilo que foi lido. Quando o processador tenta executar uma instrução que tenha sido anteriormente invalidada, uma interrupção do tipo \emph{prefetch} ocorre \cite[p.~58]{armarm}. Note que é possível do processador ler aquela região para executar em seguida, mas ainda não gerar esta interrupção; isto ocorre quando o fluxo é desviado antes da tentativa de executar aquela instrução (por um \emph{branch} por exemplo).
+
+\textbf{\emph{Data Abort:}} Assim como a \emph{prefetch abort}, esta interrupção também leva ao modo Abort (e somente estas duas interrupções). Este tipo de interrupção pode acontecer quando uma instrução tenta acessar uma região de memória que o modo atual de execução não tenha permissão para acessar. Acesso a regiões de memória virtual não mapeadas pela MMU também geram esta interrupção.
+
+
+%Source: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0068b/BABFCEEG.html
+\textbf{Interrupção de Software: } Existe uma instrução no assembly do ARMv9 que permite que seja feita uma interrupção de software (\verb+swi+). Esta instrução pode ser acompanhada de um número de 8 bits, significando que é possível se criar 256 interrupções de software diferentes. Esta interrupção leva ao modo supervisor.
+
+\subsection{(\emph{Timers})}
 Cada um dos \emph{cores} possui um \emph{timer} privado de 32 bits e ambos \emph{cores} compartilham um \emph{timer} global de 64 bits. Estes \emph{timers} trabalham numa frequ�ncia sempre igual � metade da frequ�ncia da CPU.
 No n�vel de sistema (\emph{sistem-level (PS)}), h� dois \emph{timers} triplos, cujas frequ�ncias s�o sempre um quarto ou um sexo da frequ�ncia da CPU.
 
@@ -495,7 +495,7 @@ O valor padr�o de BDIV � 15, portanto, fixiando-se esse valor e resolvendo a
 
 Ap�s estas configura��es, dentre outras que o manual descreve, a UART est� pronta para ser usada. Os dois principais m�todos usados da UART s�o o put e o get, o primeiro escreve um caractere na sa�da serial, sendo que este pode ser lido, por exemplo atrav�s de uma entrada USB, para imprimir estes caracteres numa tela; algo muito �til para depura��o.
 
-\section{Porte do \emph{timer}}
+\section{Porte do \emph{Timer}}
 
 
 
@@ -560,6 +560,8 @@ Desmontando-se o bin�rio da imagem produzida na compila��o do EPOS (\emph{
 }
 
 Tamb�m foi necess�rio definir as pilhas (\emph{stacks}) do sistema, assim como reservar um espa�o para a pilha dos tratadores de interrup��o. O \emph{layout} escolhido segue na tabela \ref{tab:stacks}.
+Este é o \emph{layout} usado durante o desenvolvimento. Somente as pilhas de usuário e de algum modo privilegiado (como o supervisor) são necessárias, portanto a pilha de supervisor acabaria por englobar as demais posições que aparecem na tabela \ref{tab:stacks}. Na próxima seção é explicado como foi feito para não precisar reservar espaço na memória para as demais pilhas.
+
 \begin{table}[hb]
 	\centering
 	\begin{tabular}{ccc}
@@ -593,7 +595,7 @@ Restante do mapeamento de mem�ria:
 		\hline \hline
 		Dado & Endere�o base & Tamanho m�ximo\\[0.5ex]
 		\hline
-		Tabela da MMU		& \verb+0x00100144+ & 5242556 bytes\\
+		Tabela da MMU		& \verb+0x00100144+ & ~5mb\\
 		APP\_DATA		& \verb+0x00600000+ & 1mb\\
 		SYS\_HEAP		& \verb+0x00700000+ & 32mb\\
 		APP\_HEAP		& \verb+0x02700000+ & \\
@@ -607,12 +609,8 @@ Restante do mapeamento de mem�ria:
 
 \section{Porte do Controlador de Interrup��es}
 
-%falar sobre os handlers, qual a sequ�ncia de chamadas de fun��o
-%int_vector
+
 %os diferentes tipos de interrup��o (abort, prefetch...), dar exemplos de quando s�o gerados
-%ICCIAR and ICCEOI register
-%spurious interruption 1023
-%explicar approach usado em exception.cc
 
 Para se usar o controlador de interrup��es (que ser� referenciado como GIC no restante desta se��o, de \emph{Generic Interrupt Controller}), � necess�rio antes inicializar o distribuidor de interrup��es e as interfaces dos processadores.
 
@@ -664,8 +662,8 @@ O principal tratador � o tratador de interrup��es IRQ (\verb+irc_handler+)
  60 
  61   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT\n"//go back to SVC
  62   "add r2, sp, #24 \n"  // sp+24 is the position of the saved pc
- 63   // save address to return from interrupt into the pc position
- 64   // to retore context later on.
+ 63   
+ 64   // save return address into the pc position
  65   "str r0, [r2] \n" 
  66   "stmfd sp!, {r1} \n"   // save irq-spsr
  67       
@@ -680,7 +678,7 @@ O principal tratador � o tratador de interrup��es IRQ (\verb+irc_handler+)
  76             
  77   "ldmfd sp!, {r0-r3,r12,lr,pc}^ \n" // restore context
  78   //the ^ in the end of the above instruction makes the 
- 79   //irq_spsr to be restored into svc_cpsr
+ 79   //spsr to be restored into svc_cpsr
  80   );
  81 }
 \end{verbatim}
@@ -711,6 +709,11 @@ A primeira coisa que o tratador faz e descobrir qual é o número da interrupç�
 É possível que uma interrupção já tenha sido tratada por outro processador, quando isto acontece, o GIC emite uma \emph{Spurious Interruption} para indicar isto. Quando se detecta isto, o tratador não precisa tomar nenhuma outra ação, basta retornar a execução normal.
 
 Com o número da interrupção em mãos, pode-se então chamar o tratador daquele tipo de interrupção. \verb+_vector+ é um vetor de \emph{handlers}, onde para cada posição $i$, existe o tratador da interrupção número $i$. Para sinalizar que uma interrupção foi tratada, deve escrever no registrador ICCEOI (End of Interruption) o número lido no ICCIAR (ou seja, o número da interrupção e processador de destino).
+
+
+Normalmente, interrupções de \emph{timer} é o tipo mais frequente de interrupção durante a execução do sistema. Dele dependem o escalonador de processos (ou \emph{threads}), Delay, Chronometer e Alarm. Como mencionado na seção do porte do \emph{timer}, uma mesma interrupção pode gerar a chamada de mais de um handler, como a do \emph{timer} que chama a do Alarm e do escalonador.
+
+\subsection{}
 
 
 \bibliographystyle{ufscThesis/ufsc-alf}
