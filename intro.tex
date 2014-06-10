@@ -1,0 +1,38 @@
+\chapter{Introdução}
+
+O presente trabalho visa descrever como foi feito o porte\footnote{Porte é um estrangeirismo da palavra \emph{port}, que, no âmbito da computação, significa o ato de fazer um mesmo programa/sistema/SO funcionar em diferentes ambientes. Por exemplo, fazer um software que antes só funcionava no Linux passar a funcionar em um outro SO (sistema operacional) pode ser considerado um porte. Uma palavra alternativa que poderia ser usada é ``suporte'', entretanto acredito que esta palavra não expresse apropriadamente o que foi feito, já que essa palavra normalmente é associada com um serviço pago de assistência técnica, e o próprio fraseamento do que foi feito se tornaria de mais difícil compreensão e prolixo com esta palavra.} do sistema operacional EPOS para a plataforma Zedboard, bem como comentar sobre as decisões tomadas e problemas enfrentados.
+
+\section{Motivação}
+EPOS é um sistema operacional que visa reduzir o custo de produção das aplicações embarcadas provendo um ambiente onde a aplicação do desenvolvedor possa rodar sem que ele tenha que lidar com configurações de baixo nível. Sendo assim é importante que o EPOS seja portado para um grande número de plataformas, do contrário sua utilidade prática seria prejudicada.
+
+Zedboard é uma plataforma que usa o SoC Xilinx 7000, que por sua vez possui o processador \emph{dual core} ARM Cortex A9. Existe uma dupla motivação para se fazer o porte para esta plataforma: Primeiro que o EPOS ainda não foi portado para um processador RISC \emph{multicore}, e acredita-se que este porte poderá possibilitar linhas de pesquisa com o EPOS que antes só poderiam ser feitos num CISC, algo que não é o ideal considerando-se o nicho de aplicação do EPOS. O segundo fator está relacionado com o próprio Zedboard. Dentro do LISHA (Laboratório de Integração Software-Hardware) há uma linha de pesquisa sobre Smart Homes (ou Smart Buildings) em cujo contexto se pretende usar um Zedboard.
+
+\section{Objetivos Gerais}
+
+O objetivo deste trabalho é portar o sistema operacional EPOS e documentar este processo no presente documento. O porte consiste em adaptar os componentes que, dentro da arquitetura do EPOS, são chamados de mediadores de hardware. Cada mediador precisa ser refeito para cada plataforma.
+Este trabalho terá certo direcionamento para as pessoas que no futuro precisem fazer um novo porte do EPOS, de modo que elas não precisem passar pelos mesmos problemas e possam, portanto, fazer isto mais eficientemente.
+
+\section{Objetivos Específicos}
+Dos objetivos específicos, pode-se organizá-los da seguinte forma:
+
+\begin{enumerate}
+    \item Estudo da arquitetura do EPOS, da arquitetura do ARM Cortex A9 e do Zedboard.
+    \item Portes
+    \begin{enumerate}
+        \item Timers
+        \item Controlador de Interrupção
+        \item MMU
+        \item CPU
+        \item Inicialização elf e Multicore
+    \end{enumerate}
+    \item Validações
+    \begin{enumerate}
+        \item Escalonadores em single e multicore
+        \item Threads
+        \item Thread Periódica
+        \item Alarmes
+        \item Cronômetro
+        \item Sincronização
+    \end{enumerate}
+    \item Documentação
+\end{enumerate}

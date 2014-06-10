@@ -1,0 +1,311 @@
+\chapter{Porte}
+
+% Eu poderia descrever como eu tenho que incluir cada classe feita em ./include/system/types.h, opções de traits, etc..
+
+
+Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões e dificuldades encontradas.
+
+Antes de entrar nas especificidades de cada componente, é interessante colocar aqui alguns conceitos comuns que são usados em cada mediador.
+
+A maneira usada para se comunicar, configurar e ler o estado de um dado componente de hardware é através da leitura e/ou escrita em registradores mapeados em memória. Um registrador mapeado em memória basicamente é uma região fixa da memória, onde uma escrita naquela posição indica uma escrita no registrador lá mapeado.
+Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, responsável por indicar quantos ciclos\footnote{Na realidade é o número de baud\_samples que se passaram.} a UART deve esperar um novo caractere chegar antes de emitir uma interrupção de \emph{timeout}. Este registrador está mapeado na posição de memória 0xE000001C para a UART0. Portanto, para configurar que o número de ciclos esperado seja de 20, basta escrever este número naquela posição. Uma maneira de fazer esta escrita, por exemplo, em C/C++, é: \verb+*((unsigned long*)0xE000001C) = 20;+.
+
+%\section{memory map}
+
+%\section{Boot}
+
+\section{Traits}
+
+Existem 4 arquivos traits.h que devem ser levados em consideração em um porte, dois deles devem ser completamente reescritos. Os arquivos \verb+./include/traits.h+ e \verb+/include/system/traits.h+ (onde '.' é a pasta raiz do código) possuem configurações gerais do EPOS, que, a princípio, devem ser independentes de arquitetura. Na prática há alguns pequenos ajustes que devem ser feitos nesses arquivos, pois é lá que se define, por exemplo, se o EPOS trabalhará em um processador \emph{multicore}, se utilizará \emph{scratchpad}, quais componentes estarão em modo de depuração e etc; entretanto isto se resume a trocar o valor de algumas variáveis de \emph{true} para \emph{false} ou o contrário.
+
+Os outros dois arquivos são \verb+./include/mach/zynq/traits.h+ e \verb+./include/arch/armv7/traits.h+. Essa divisão é necessária pois, como dito anteriormente, é possível de um mesmo processador estar em diferentes \emph{machines}, e, caso seja necessário fazer um porte para esta plataforma, bastaria modificar os arquivos da pasta \emph{mach}, deixando os da pasta \emph{arch} praticamente intáctos, o que facilita muito novos portes.
+
+Em \verb+./include/arch/armv7/traits.h+ trata das opções específicas do processador, portanto é lá que opções como \emph{endianess}, velocidade de \emph{clock}, número de \emph{cores}, tamanho da heap e stacks, bem como outras opções pertinentes ao mapeamento de memória e opções da MMU podem ser configuradas.
+
+No arquivo de traits da \emph{machine}, ficam as opções de configuração de componentes como a UART, controlador de interrupções, \emph{timer}, e qualquer componente de interfaceamento externo à placa (rede, por exemplo). Componentes podem ser facilmente desativados nestas opções.
+
+\section{Metaprogramação estática}
+
+A arquitetura do EPOS usa pesadamente de metaprogramação estática para, em tempo de compilação, selecionar a arquitetura, bem como cada componente que será ou não utilizado. Por exemplo, podemos definir um \emph{if} estático para selecionar de qual classe a classe Chronometer irá derivar. Primeiramente a definição do \emph{if}:
+
+\begin{verbatim}
+template<bool condition, typename Then, typename Else> struct IF
+{
+    typedef Then Result;
+};
+\end{verbatim}
+
+Este template, a princípio, nada mais faz do que tomar 3 parâmetros e então criar um tipo chamado Result igual ao segundo parâmetro, entretanto se nós fizemos uma especialização deste template, ele passa ser útil:
+
+\begin{verbatim}
+template<typename Then, typename Else> struct IF<false, Then, Else>
+{
+    typedef Else Result;
+};
+\end{verbatim}
+
+Com esta especialização, toda vez que o primeiro parâmetro resolver-se como falso, Result será definido como o terceiro parâmetro. Temos, portanto, um \emph{if} metaprogramado funcional, agora voltemos ao exemplo do chronometro.
+
+Suponha que caso a arquitetura não seja multicore, e nos traits o TSC (\emph{time stamp clock}) esteja ativo, então deseja-se que Chronometer derive de TSC\_Chronometer, do contrário de Alarm\_Chronometer.
+
+Isto pode ser feito usando nosso \emph{if} metaprogramado da seguinte forma:
+
+\begin{verbatim}
+class Chronometer: public
+IF<Traits<TSC>::enabled && !Traits<System>::multicore,
+TSC_Chronometer, Alarm_Chronometer>::Result
+{//class body};
+\end{verbatim}
+
+Deste modo, Chronomometer derivará de IF::Result, que será resolvido como TSC\_Chronometer ou Alarm\_Chronometer. Note que esse exemplo também mostra um uso do Traits, onde para descobrir se o TSC está ativo, bastou ler a constante Traits<TSC>::enabled, e para saber se o sistema é multicore bastou ler Traits<System>::multicore. Todo esse processamento causa zero \emph{overhead} em tempo de execução.
+
+\section{Porte da UART}
+
+A inicialização da UART foi feita de acordo com o sugerido pelo manual em \cite[p.~554]{ug585}. Nesta seção será comentado as decisões tomadas na configuração inicial da UART, em particular por causa dos momentos em que o manual exigia que o desenvolvedor tomasse uma decisão.
+
+A primeira decisão que foi necessária é a de escabelecer qual será a taxa de transmissão (\emph{Baud Rate}) da UART. 
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=10cm]{figuras/uart_board_rate}
+    \caption{Esquemático de como é criada a taxa de transmissão.}
+	\label{fig:uart}
+\end{figure}
+
+Primeiramente foi necessário configurar o \emph{clock} de referência da UART. Para isto, deve-se dividir o \emph{clock} que vem do I/O PLL (que por sua vez deriva do PS\_CLK, que é o \emph{clock} geral do sistema). Recomenda-se dividir o \emph{clock} da I/O PLL de modo a se obter 50 ou 33 MHz.
+O \emph{clock} da I/O PLL, por padrão, multiplica o PS\_CLK (de 33.33 MHz) por 26, resultando num \emph{clock} de 866 MHz.
+No manual diversas vezes é usado como exemplo para o \emph{clock} de referência da UART 50 MHz, portanto, arbitrariamente, escolheu-se esse valor. Logo, deve-se configurar o registrador UART\_CLK\_CTRL, responsável por configurar o \emph{clock} de entrada da UART, para dividir este \emph{clock} vindo da I/O PLL por 17 ($866/17 = 50$).
+
+Agora, com este \emph{clock} estabelecido, que vamos chamar de sel\_clk (de acordo com a nomenclatura do manual), devemos calcular quanto será a taxa de transmissão.
+Após alguma pesquisa em fóruns de desenvolvedores de software básico, notei que uma taxa de transmissão de 9600 bps é o mais comum, portanto, assumindo este valor, a próxima etapa é configurar os dois divisores de \emph{clock} que ajustam a taxa de transmissão, como indicado na figura \ref{fig:uart}.
+
+O primeiro divisor chama-se CD (\emph{clock divider}), que configura a constante para se dividir o \emph{clock}, e BDIV um segundo divisor usado para sobreamostragem, organizado como mostrado na figura \ref{fig:uart}. O valor da taxa de transmissão final é calculado da seguinte forma:
+\begin{equation}
+	\text{taxa de transmissão} = \frac{sel\_clk}{CD \times (BDIV+1)}
+\end{equation}
+
+O valor padrão de BDIV é 15, portanto, fixiando-se esse valor e resolvendo a equação por CD, temos que $CD = 325$. Configurando-se estes valores nos seus respectivos registradores, obtém-se a taxa de transmissão desejada de 9600 bps.
+
+Após estas configurações, dentre outras que o manual descreve, a UART está pronta para ser usada. Os dois principais métodos usados da UART são o put e o get, o primeiro escreve um caractere na saída serial, sendo que este pode ser lido, por exemplo através de uma entrada USB, para imprimir estes caracteres numa tela; algo muito útil para depuração.
+
+\section{Porte do \emph{timer}}
+
+
+
+Um \emph{timer} permite contar um certo número de ciclos, e, ao final da contagem, ele emite uma interrupção ao GIC, para que então o processador trate este evento. Entretanto note que é possível de existir mais \emph{timers} sendo usados logicamente do que \emph{timers} físicos disponíveis, significando que um mesmo \emph{timer} deve conseguir servir a mais de uma requisição simultaneamente.
+
+Portanto não podemos apenas configurar um \emph{timer} para contar initerruptamente até passar o tempo que desejamos, do contrário novas requisições sobreescreveriam a anterior. Para ilustrar, suponha que se queira contar por 10 segundos, como o \emph{clock} do \emph{timer} é de 333 MHz (periodo $1/333 \times 10^6$), bastaria configurar o \emph{timer} para contar por $10 \times 333 \times 10^6$ ciclos e então chamar o \emph{handler} associado a interrupção gerada quando o \emph{timer} chegar em zero.
+
+Agora imagine que, no cenário acima, enquanto o \emph{timer} ainda está servido àquela solicitação de contagem, apareça outra solicitação, de um alarme por exemplo, e queria contar por 20 segundos. Se esta solicitação sobrescrever o registrador de configuração do \emph{timer}, a solicitação anterior não terá seu pedido atendido a tempo. Note também que o escalonador de processos também estará usando este \emph{timer}.
+
+Para resolver este problema, na arquitetura do EPOS existe o conceito de ticks (algo parecido com o que se faz no Linux), onde se configura um \emph{timer} para gerar interrupções em um intervalo regular, intervalo este que deve ser pequeno o suficiente para poder atender a demanda de contagens de pequenos valores, assim como não ser pequeno demais ao ponto de gastar mais processamento tratando as interrupções geradas pelo \emph{timer} do que servindo à outras funções. Assim, cada objeto que instancia (ou usa) um \emph{timer}, como o Alarm, Scheduler e Chronometer, nunca realmente tocam em algum registrador do \emph{timer} (portanto esses componentes são independentes de arquitetura), e, no lugar disso, computam quantos ticks, isto é, quantas interrupções de \emph{timer} aconteceram.
+
+Para exemplificar o funcionamento destes componentes, tomemos o escalonador de processos. No construtor do escalonador, é enviado como parâmetro o periodo de escalonamento, ou seja, quanto tempo (no máximo) uma thread pode executar antes de ser escalonada. Para se saber quantos ticks devem ser contados antes de se escalonar um processo, basta dividir a frequência em que os ticks incrementam, pela frequência de escalonamento. Por exemplo, se o timer gera uma interrupção a cada 1 milisegundo (1000 Hz), e o escalonador escalona um processo a cada 10 milisegundos (100 Hz), o número de ticks a se contar é $1000/100 = 10$ ticks. Estes são os valores usados na implementação também.
+
+No caso do Alarm em específico, internamente há uma fila com todas as requisições de alarme, ordenado do menor tick ao maior. Quando ocorre uma interrupção de timer, é chamado primeiramente o \emph{handler} que gerencia esta fila, e, caso um alarme desta fila já tenha esperado os ticks que requisitou, então o \emph{handler} desse alarme é chamado (este \emph{handler} é definido pelo usuário que instanciou o alarme).
+
+
+O construtor do \verb+Zynq_Timer+ recebe como parâmetro a frequência que o contador deve contar, assim como o \emph{handler} que deve ser chamado quando esta contagem terminar (isto é, a função chamada quando acontecer uma interrupção devido ao timer ter chego a zero), e um número chamado channel, que serve para demultiplexar qual handler deve ser chamado.
+
+A classe \verb+Zynq_Timer+ possui um atributo estático (e portanto único para todas as instâncias) definido como \verb+Zynq_Timer*+ \verb+_channels[CHANNELS]+, onde \verb+CHANNELS+ é uma constante com o número de diferentes classes usando o \emph{timer} (Scheduler e Alarm). Este vetor é necessário pois, quando uma interrupção de \emph{timer} acontece e o \emph{handler} do \emph{timer} é chamado, o \emph{handler} pode iterar sobre ele, chamando todos os respectivos \emph{handlers} daquelas classes.
+
+
+Os 4 principais registradores a se trabalhar para configurar o \emph{timer} são o \verb+load+, registrador onde se escreve por quantos ciclos se deve contar; o \emph+counter+, que é o registrador que contém o atual valor contado, sendo decrementado a cada ciclo até chegar em zero, chegando em zero o é gerada uma interrupção número 29; registrador \emph+control+, que permite configurar certos comportamentos do \emph{timer}, como o de ativa-lo, ativar modo cíclico, ativar interrupções e atribuir um valor para o \emph{prescale}; e finalmente o registrador \emph+interrupt status+, que, como o nome indica, permite que se leia o status das interrupções de timer. Todos os timers trabalham à metade do \emph{clock} do sistema, ou seja, usando o \emph{clock} CPU\_3x2x.
+
+Durante a inicialização do sistema, o \emph{timer} é configurado para gerar interrupções periodicamente, e esta configuração não é alterada durante a execução da aplicação. Como o construtor do \verb+Zynq_Timer+ recebe uma frequência como parâmetro, é necessário se converter esta frequência para um número de ciclos a se contar. Para isto, é necessário se levar em conta a frequência com que o contador é decrementado, para então se definir um valor a ser decrementado periodicamente de modo a fornecer a frequência desejada.
+
+Como sabemos que o \emph{clock} ao qual o \emph{timer} está submetido é metade do \emph{clock} do sistema, e que antes dele chegar ao contador, este mesmo clock é dividido por um divisor chamado \emph{prescaler} (que divide pelo valor configurado nele mais 1), podemos dizer que:
+\[
+	COUNTER\_CLOCK\_FREQUENCY = \frac{SYSTEM\_CLOCK}{2 \times (PRESCALER+1)}
+\]
+Logo, usando a mesma linha de racioncínio exposta no exemplo de cálculo de ticks, temos que o valor a ser carregado no \verb+load_register+ (que será chamado de \verb+load_value+), sendo a frequência desejada F, é:
+\begin{equation}
+	\text{load\_value} = \frac{SYSTEM\_CLOCK}{2 \times (PRESCALER+1) \times F}
+\end{equation}
+
+
+Precisamos agora definir o prescaler. Definimos ele como a razão entre o \emph{clock} do \emph{timer} pela frequência desejada ($\frac{\text{clock}}{2 \times F}$). Há a premissa de que a frequência desejada não será maior que a do \emph{clock} do \emph{timer}, pois é impossível contar mais rápido que isto. Normalmente esta razão ($\frac{\text{clock}}{2 \times F}$) será um número maior que 255, já que o clock costuma ser muito mais rápido, e como o campo onde se registra o valor do prescaler possui apenas 8 bits, frequentemente o prescaler será 255.
+
+
+
+\section{Mapeamento de Memória}
+
+Por padrão, as 8 primeiras palavras da memória (ou seja, $8 \times 4 = 32$ bytes) devem possuir instruções específicas. A primeira palavra (memória posição 0) contém a primeira instrução a ser executada, e, nas 7 palavras seguintes, fica a tabela de vetores (\emph{vector table}). Como abaixo da instrução inicial há uma tabela que não se deseja executar no momento de inicialização do sistema, esta primeira instrução necessariamente é um \emph{jump} para uma outra região, para aí então se iniciar o processo de \emph{boot}. 
+As demais 7 palavras, pertencentes à tabela de vetores possuem, similarmente, \emph{jumps} para o código onde o tratador da exceção se localiza. A primeira instrução da tabela (posição 0x4) deve conter um \emph{jump} o tratador de uma exceção do tipo undefined instruction, depois, na próxima palavra, a software interruption, prefectch abort, data abort, reserved, irq e, finalmente, fiq, nesta ordem. Vide seções \ref{sec:interrupt} e \ref{sec:operating_modes} para mais detalhes.
+
+
+%desmontamento do binário da imagem do EPOS
+Desmontando-se o binário da imagem produzida na compilação do EPOS (\emph{dump}), deve-se obter uma saída semelhante a esta exemplificada abaixo em seus primeiros 32 bytes:
+
+\label{dump}
+\hspace*{-1.8cm}\vbox{
+\begin{verbatim}
+	00000000 <_vector_table>:
+		 0:	e59ff7fc 	ldr	pc, [pc, #2044]	; 804 <_start_addr>
+		 4:	e59ff7fc 	ldr	pc, [pc, #2044]	; 808 <_undefined_instruction_addr>
+		 8:	e59ff7fc 	ldr	pc, [pc, #2044]	; 80c <_software_interrupt_addr>
+		 c:	e59ff7fc 	ldr	pc, [pc, #2044]	; 810 <_prefetch_abort_addr>
+		10:	e59ff7fc 	ldr	pc, [pc, #2044]	; 814 <_data_abort_addr>
+		14:	e59ff7fc 	ldr	pc, [pc, #2044]	; 818 <_reserved_addr>
+		18:	e59ff7fc 	ldr	pc, [pc, #2044]	; 81c <_irq_handler_addr>
+		1c:	e59ff7fc 	ldr	pc, [pc, #2044]	; 820 <_fiq_handler_addr>
+\end{verbatim}
+}
+
+Também foi necessário definir as pilhas (\emph{stacks}) do sistema, assim como reservar um espaço para a pilha dos tratadores de interrupção. O \emph{layout} escolhido segue na tabela \ref{tab:stacks}.
+Este é o \emph{layout} usado durante o desenvolvimento. Somente as pilhas de usuário e de algum modo privilegiado (como o supervisor) são necessárias, portanto a pilha de supervisor acabaria por englobar as demais posições que aparecem na tabela \ref{tab:stacks}. Na próxima seção é explicado como foi feito para não precisar reservar espaço na memória para as demais pilhas.
+
+\begin{table}[hb]
+	\centering
+	\begin{tabular}{ccc}
+		\hline \hline
+		Pilha & Endereço base & Tamanho máximo (bytes)\\[0.5ex]
+		\hline
+		Supervisor		& \verb+0x00100000+ & 983040\\
+		Irq			& \verb+0x00100040+ & 64\\
+		System			& \verb+0x00100080+ & 64\\
+		Abort			& \verb+0x001000c0+ & 64\\
+		Fiq			& \verb+0x00100100+ & 64\\
+		Undefined		& \verb+0x00100140+ & 64\\[1ex]
+		\hline
+	\end{tabular}
+	\caption{Pilhas do sistema com seus tamanhos e posições.}
+	\label{tab:stacks}
+\end{table}
+
+Lembrando que pilhas, num sistema operacional, tradicionalmente crescem em direção à posições menores da memória, por isto que, por exemplo, a pilha Irq possui 64 bytes, já que $\texttt{0x100040}-\texttt{0x100000} = 40_{16} = 64_{10}$. A pilha do usuário, portanto, localiza-se na última posição da memória (512 MB neste caso) e cresce para ``baixo'' (posições menores de memória) a partir de lá.
+
+%Falar da heap.
+%Memory top/base, app_code, app_data...
+
+
+%%>>>>>continue from here
+Restante do mapeamento de memória:
+\ref{tab:mem}.
+\begin{table}[hb]
+	\centering
+	\begin{tabular}{ccc}
+		\hline \hline
+		Dado & Endereço base & Tamanho máximo\\[0.5ex]
+		\hline
+		Tabela da MMU		& \verb+0x00100144+ & ~5mb\\
+		APP\_DATA		& \verb+0x00600000+ & 1mb\\
+		SYS\_HEAP		& \verb+0x00700000+ & 32mb\\
+		APP\_HEAP		& \verb+0x02700000+ & \\
+		APP\_STACK		& \verb+0x1ffffffc+ & \\[1ex]
+		\hline
+	\end{tabular}
+	\caption{Pilhas do sistema com seus tamanhos e posições.}
+	\label{tab:stacks}
+\end{table}
+
+
+\section{Porte do Controlador de Interrupções}
+
+%falar sobre os handlers, qual a sequência de chamadas de função
+%int_vector
+%os diferentes tipos de interrupção (abort, prefetch...), dar exemplos de quando são gerados
+%ICCIAR and ICCEOI register
+%spurious interruption 1023
+%explicar approach usado em exception.cc
+
+Para se usar o controlador de interrupções (que será referenciado como GIC no restante desta seção, de \emph{Generic Interrupt Controller}), é necessário antes inicializar o distribuidor de interrupções e as interfaces dos processadores.
+
+É no distribuidor que é determinada a prioridade de cada interrupção, e onde é decidido se determinada interrupção deve ou não ser encaminhada para a interface de um determinado processador. Todas as interrupções passam por ele.
+
+A interface dos processadores é por onde os processadores se comunicam com o GIC. Nela o processador confirmar que recebeu a interrupção (\emph{acknowledge}), indicar que terminou de tratar a mesma, definir prioridades entre diferentes interrupções, indicar uma política de preempção de interrupções, ou mesmo desligar esta interface. Como o GIC é dividido logicamente é ilutrado na imagem \ref{img:gic}
+
+\begin{figure}[ht!]
+    \centering
+    \includegraphics[width=8cm]{figuras/gic}
+    \caption{Divisão lógica do GIC.}
+    \label{img:gic}
+\end{figure}
+
+\subsection{Inicialização}
+
+Na inicialização do distribuidor, através dos registradores mapeados em memória de configuração do mesmo, é definido, para cada uma das possíveis interrupções, se elas são \emph{level-sensitive} ou \emph{edge-triggered}.
+Em seguida configura-se a prioridade de cada interrupção. A princípio todas as interrupções foram definidas como tendo a mesma prioridade, mas isto é configurável caso necessário.
+É configurado então o processador-alvo de cada interrupção, isto é, para quais interfaces de processador uma determinada interrupção será encaminhada. Finalmente então são ativadas as interrupções.
+
+A inicialização da interface do processador é mais simples. Primeiro se configura a máscara de prioridade da CPU, isto é, qual é o nível de prioridade mínimo que uma interrupção precisa ter para interromper aquele processador. Na implementação esta máscara está desativada. Depois configura-se a política grupos de preempção. No GIC é possível separar interrupções em grupos de preempção, onde se define se determinado grupo pode preemptar determinado outro grupo. Todas as interrupções foram colocadas no mesmo grupo e interrupções podem ser preemptadas.
+
+Adicionalmente a estas configurações, é possível de mascaras as interrupções FIQ e IRQ através do CPSR (\emph{Current Program Status Register}), alterando-se os bits 6 e 7 dele, para mascarar interrupções FIQ e IRQ, respectivamente. Normalmente é o que é feito quando é necessário mascaras as interrupções, enquanto se mantém as configurações do GIC.
+
+\subsection{Fluxo de execução ao se receber uma interrupção}
+
+O processador, ao se receber uma interrupção, (e, portanto as interrupções estão ativas e não mascaradas pela interface ou pelo CPSR), o processador para a execução do código que estava executando e então executa a instrução contida na tabela de vetores (mostrada na página \pageref) correspondente ao tipo de interrupção recebida. Esta instrução é um jump para um tratador (\emph{handler}) daquele tipo de interrupção.
+
+O principal tratador é o tratador de interrupções IRQ (\verb+irc_handler+), sendo que este precisa ser discutido com mais profundidade. Abaixo segue o código deste tratador:
+
+\begin{verbatim}
+ 43 void _irq_handler() {
+ 44   ASMV(
+ 45   // A few definitions
+ 46   ".equ ARM_MODE_FIQ,      0x11 \n"
+ 47   ".equ ARM_MODE_IRQ,      0x12 \n"
+ 48   ".equ ARM_MODE_SVC,      0x13 \n"
+ 49   ".equ IRQ_BIT,           0x80 \n"
+ 50   ".equ FIQ_BIT,           0x40 \n"
+ 51 
+ 52   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT \n" // go to SVC
+ 53   // save current context (lr, sp and spsr are banked registers)
+ 54   "stmfd sp!, {r0-r3,r12,lr,pc}\n"
+ 55 
+ 56   "msr cpsr_c, #ARM_MODE_IRQ | IRQ_BIT | FIQ_BIT\n" //go to IRQ
+ 57 
+ 58   "sub r0, lr, #4 \n" // return from irq addr
+ 59   "mrs r1, spsr   \n" // pass irq_spsr to svc r1
+ 60 
+ 61   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT\n"//go back to SVC
+ 62   "add r2, sp, #24 \n"  // sp+24 is the position of the saved pc
+ 63   
+ 64   // save return address into the pc position
+ 65   "str r0, [r2] \n" 
+ 66   "stmfd sp!, {r1} \n"   // save irq-spsr
+ 67       
+ 68   );    
+ 69   
+ 70     
+ 71   IC::int_handler();
+ 72     
+ 73   ASMV(        
+ 74   "ldmfd sp!, {r0}              \n"
+ 75   "msr spsr_cfxs, r0\n"//restore IRQ's spsr value to SVC's spsr
+ 76             
+ 77   "ldmfd sp!, {r0-r3,r12,lr,pc}^ \n" // restore context
+ 78   //the ^ in the end of the above instruction makes the 
+ 79   //spsr to be restored into svc_cpsr
+ 80   );
+ 81 }
+\end{verbatim}
+
+Após selecionar qual handler chamar, o processador muda de modo, indo, no caso de uma interrupção IRQ, para o modo de execução IRQ. Neste modo há 3 registradores banqueados: O SPSR, que contém o valor do registrador CPSR imediatamente antes da interrupção, sendo necessário para que seja possível restaurar o valor original do CPSR após tratar a interupção; o LR (link register), que contém o endereço da próxima instrução que seria executada imediatamente antes da interrupção mais 4; e, finalmente, o SP (stack register), que aponta para a pilha própria desde modo (cada modo pode possuir sua própria pilha).
+
+Para evitar desperdício de memória reservando uma pilha própria apenas para este modo, optou-se por não usar uma pilha no modo IRQ, e, no lugar disto, usar sempre a mesma pilha do modo supervisor (que é o modo de exceução do processador quando ele inicia). Para isto, a primeira instrução a se executar é uma mudança de modo para voltar ao modo supervisor, enquanto mantendo novas interrupções desligadas; lá é salvo o contexto na pilha daquele modo. Entretanto para que seja possível restaurar o fluxo de execução no mesmo estado em que o processador estava no momento imediatamente antes da interrupção, é necessário voltar ao modo IRQ para obter-se os valores contidos dos registradores banqueados SPSR e LR; após isto, pode-se então voltar ao modo \emph{supervisor}. Na linha 62 do código é somado 24 à pilha pois lá é a posição de memória onde está salvo o PC após ele ter sido empilhado na linha 54, e deseja-se sobreescrever aquele valor do PC pelo valor que estava contido no LR do modod IRQ (menos 4), pois aquela é a próxima instrução que seria executada antes da interrupção. Feito isto, salva-se o valor do SPSR do modo IRQ no topo da pilha, para ser restaurado ao CPSR mais tarde. Agora que o contexto foi salvo corretamente para ser restaurado, pode-se então chamar um tratador de interrupções genérico (que será discutido mais a frente) e escrito em C++. Após o o \verb+int_handler+ da linha 71 retornar, é feita a restauração do contexto. Primeiro se salva o CPSR no SPSR, na última instrução (ldmfd), na forma em que ela está (com um \^ no final dela e com o PC na lista), ela automaticamente restaurará o valor que está no SPSR para o CPSR. Como o PC está na lista, o fluxo de execução terá retornado a executar as instruções de antes da interrupção ocorrer.
+
+Agora será discutido como que as interrupções são tratadas individualmente. O corpo do \verb+int_handler+ é bastante curto, então vale a pena escreve-lo aqui.
+
+\begin{verbatim}
+void Zynq_IC::int_handler()
+{	
+    unsigned int icciar_value = CPU::in32(IC::GIC_PROC_INTERFACE 
+    	| IC::ICCIAR);
+	IC::Interrupt_Id id = icciar_value & IC::INTERRUPT_MASK;
+
+	if(id == 1023){
+		kout << "Spurious interruption received\n";
+		return;
+	}
+    _vector[id](id);
+    CPU::out32(IC::GIC_PROC_INTERFACE | IC::ICCEOI, icciar_value);
+}
+\end{verbatim}
+
+A primeira coisa que o tratador faz e descobrir qual é o número da interrupção que foi gerada, para assim saber como tratar aquela interrupção. Isto é feito lendo-se o registrador ICCIAR (\emph{Interrupt Acknowledge Register}), que provê o número da interrupção e também o processador endereçado.
+É possível que uma interrupção já tenha sido tratada por outro processador, quando isto acontece, o GIC emite uma \emph{Spurious Interruption} para indicar isto. Quando se detecta isto, o tratador não precisa tomar nenhuma outra ação, basta retornar a execução normal.
+
+Com o número da interrupção em mãos, pode-se então chamar o tratador daquele tipo de interrupção. \verb+_vector+ é um vetor de \emph{handlers}, onde para cada posição $i$, existe o tratador da interrupção número $i$. Para sinalizar que uma interrupção foi tratada, deve escrever no registrador ICCEOI (End of Interruption) o número lido no ICCIAR (ou seja, o número da interrupção e processador de destino).
+
+
+Normalmente, interrupções de \emph{timer} é o tipo mais frequente de interrupção durante a execução do sistema. Dele dependem o escalonador de processos (ou \emph{threads}), Delay, Chronometer e Alarm. Como mencionado na seção do porte do \emph{timer}, uma mesma interrupção pode gerar a chamada de mais de um handler, como a do \emph{timer} que chama a do Alarm e do escalonador.
