@@ -17,7 +17,7 @@ Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, respon
 
 Existem 4 arquivos traits.h que devem ser levados em consideração em um porte, dois deles devem ser completamente reescritos. Os arquivos \verb+./include/traits.h+ e \verb+/include/system/traits.h+ (onde `.' é a pasta raiz do código) possuem configurações gerais do EPOS, que, a princípio, devem ser independentes de arquitetura. Na prática há alguns pequenos ajustes que devem ser feitos nesses arquivos, pois é lá que se define, por exemplo, se o EPOS trabalhará em um processador \emph{multicore}, se utilizará \emph{scratchpad}, quais componentes estarão em modo de depuração e etc; entretanto isto se resume a trocar o valor de algumas variáveis de \emph{true} para \emph{false} e vice-versa.
 
-Os outros dois arquivos são \verb+./include/mach/zynq/traits.h+ e \verb+./include/arch/armv7/traits.h+. Essa divisão é necessária pois, como dito anteriormente, é possível de um mesmo processador estar em diferentes \emph{machines}, e, caso seja necessário fazer um porte para aquela plataforma, bastaria modificar os arquivos da pasta \emph{mach}, deixando os da pasta \emph{arch} praticamente intactos, o que facilita muito novos portes.
+Os outros dois arquivos são \verb+./include/mach/zynq/traits.h+ e\\ \verb+./include/arch/armv7/traits.h+. Essa divisão é necessária pois, como dito anteriormente, é possível de um mesmo processador estar em diferentes \emph{machines}, e, caso seja necessário fazer um porte para aquela plataforma, bastaria modificar os arquivos da pasta \emph{mach}, deixando os da pasta \emph{arch} praticamente intactos, o que facilita muito novos portes.
 
 O arquivo \verb+./include/arch/armv7/traits.h+ trata das opções específicas do processador, portanto é lá que opções como \emph{endianess}, velocidade de \emph{clock}, número de \emph{cores}, tamanho da \emph{heap} e \emph{stacks}, bem como outras opções pertinentes ao mapeamento de memória e opções da MMU podem ser configuradas.
 
@@ -87,7 +87,7 @@ O valor padrão de BDIV é 15, portanto, fixando-se este valor e resolvendo a eq
 
 Após estas configurações, dentre outras que o manual descreve, a UART está pronta para ser usada. Os dois principais métodos usados da UART são o \verb+put+ e o \verb+get+, o primeiro escreve um caractere na saída serial, sendo que este pode ser lido, por exemplo através de uma entrada USB, para imprimir estes caracteres numa tela; algo muito útil para depuração.
 
-\section{Porte do \emph{timer}}
+\section{Porte do \emph{Timer}}
 
 
 
@@ -106,14 +106,34 @@ No caso do Alarm em específico, internamente há uma fila com todas as requisi�
 
 O construtor do \verb+Zynq_Timer+ recebe como parâmetro a frequência que o contador deve contar, assim como o \emph{handler} que deve ser chamado quando esta contagem terminar (isto é, a função chamada quando acontecer uma interrupção devido ao \emph{timer} ter chego a zero), e um número chamado \verb+channel+, que serve para demultiplexar qual \emph{handler} deve ser chamado.
 
-A classe \verb+Zynq_Timer+ possui um atributo estático (e portanto único para todas as instâncias) definido como \verb+Zynq_Timer*+ \verb+_channels[CHANNELS]+, onde \verb+CHANNELS+ é uma constante com o número de diferentes classes usando o \emph{timer} (Scheduler e Alarm). Este vetor é necessário pois, quando uma interrupção de \emph{timer} acontece e o \emph{handler} do \emph{timer} é chamado, o \emph{handler} pode iterar sobre ele, chamando todos os respectivos \emph{handlers} daquelas classes.
+A classe \verb+Zynq_Timer+ possui um atributo estático (e portanto único para todas as instâncias) definido como \verb+Zynq_Timer*+ \verb+_channels[CHANNELS]+, onde \verb+CHANNELS+ é uma constante com o número de diferentes classes usando o \emph{timer} (Scheduler e Alarm). Este vetor é necessário pois, quando uma interrupção de \emph{timer} acontece e o \emph{handler} do \emph{timer} é chamado, este \emph{handler} pode iterar sobre ele, chamando todos os respectivos \emph{handlers} daquelas classes. Abaixo segue um exemplo de código de como isto pode ser feito:
 
+\begin{verbatim}
+Zynq_Timer * Zynq_Timer::_channels[CHANNELS];
+
+void Zynq_Timer::int_handler(IC::Interrupt_Id id)
+{
+  if((!Traits<System>::multicore ||
+    (Traits<System>::multicore && (Machine::cpu_id() == 0)))
+    && _channels[ALARM])
+  {
+    _channels[ALARM]->_handler();
+  }
+
+  if(_channels[SCHEDULER] &&
+    (--_channels[SCHEDULER]->_current[Machine::cpu_id()] <= 0))
+  {
+    _channels[SCHEDULER]->_current[Machine::cpu_id()] =
+      _channels[SCHEDULER]->_initial;
+    _channels[SCHEDULER]->_handler();
+  }
+}
+\end{verbatim}
+
+No código, \verb+_current + guarda o número de ticks atual daquele \emph{timer} (para cada processador), e \verb+_initial+ guarda o número inicial de ticks que foi configurado na inicialização do do escalonador. Note então que a cada interrupção de \emph{timer}, o tratador do alarme será chamado (no caso do primeiro processador), já o do escalonador, somente a cada certo número de ticks ele será chamado (cerca de 100 na implementação).
 
 Os 4 principais registradores a se trabalhar para configurar o \emph{timer} são o \verb+load+, registrador onde se escreve por quantos ciclos se deve contar; o \verb+counter+, que é o registrador que contém o atual valor contado, sendo decrementado a cada ciclo até chegar em zero, chegando em zero o é gerada uma interrupção número 29; registrador \verb+control+, que permite configurar certos comportamentos do \emph{timer}, como o de ativa-lo, ativar modo cíclico, ativar interrupções e atribuir um valor para o \verb+prescale+; e finalmente o registrador \verb+interrupt status+, que, como o nome indica, permite que se leia o status das interrupções de timer. Todos os timers trabalham à metade do \emph{clock} do sistema, ou seja, usando o \emph{clock} CPU\_3x2x.
 
-%
-%	Talvez colocar o código do handler do timer aqui?
-%
 Durante a inicialização do sistema, o \emph{timer} é configurado para gerar interrupções periodicamente, e esta configuração não é alterada durante a execução da aplicação. Como o construtor do \verb+Zynq_Timer+ recebe uma frequência como parâmetro, é necessário se converter esta frequência para um número de ciclos a se contar. Para isto, é necessário se levar em conta a frequência com que o contador é decrementado, para então se definir um valor a ser decrementado periodicamente de modo a fornecer a frequência desejada.
 
 Como sabemos que o \emph{clock} ao qual o \emph{timer} está submetido é metade do \emph{clock} do sistema, e que antes dele chegar ao contador, este mesmo \emph{clock} é dividido por um divisor chamado \verb+prescaler+ (que divide pelo valor configurado nele mais 1), podemos dizer a frequência F\_dec de decremento do contador é de:
@@ -183,20 +203,20 @@ Lembrando que pilhas, num sistema operacional, tradicionalmente crescem em dire�
 %Memory top/base, app_code, app_data...
 
 
-%%>>>>>continue from here
-Restante do mapeamento de memória:
-\ref{tab:mem}.
+
+A tabela \ref{tab:mem} ilutra o restante do mapeamento de memória feito. Para a MMU, é necessário pelo menos 4MB para mapear todo o espaço de endereçamento virtual (vide a seção de porte da MMU para mais detalhes). APP\_DATA é para armazenar a seção de dados do EPOS, o que é seguramente mais do que o suficiente. SYS\_HEAP e APP\_HEAP são as \emph{heaps} do sistema operacional e do usuário, respectivamente. APP\_STACK é a pilha da aplicação; note qe esta pilha cresce em direção contrária a da \emph{heap}, portanto um exceço de uso da \emph{heap} ou da pilha pode acabar corrompendo a memória da aplicação, gerando um erro que são chamados em alguns sistemas operacionais de \emph{stack overflow}.
+
 \begin{table}[ht]
 	\centering
 	\begin{tabular}{ccc}
 		\hline \hline
 		Dado & Endereço base & Tamanho máximo\\[0.5ex]
 		\hline
-		Tabela da MMU	& \verb+0x00100144+ & \~5mb\\
-		APP\_DATA		& \verb+0x00600000+ & 1mb\\
-		SYS\_HEAP		& \verb+0x00700000+ & 32mb\\
-		APP\_HEAP		& \verb+0x02700000+ & 473mb - APP\_STACK\\
-		APP\_STACK		& \verb+0x1ffffffc+ & 473mb - APP\_HEAP\\[1ex]
+		Tabela da MMU	& \verb+0x00100144+ & \~5MB\\
+		APP\_DATA		& \verb+0x00600000+ & 1MB\\
+		SYS\_HEAP		& \verb+0x00700000+ & 32MB\\
+		APP\_HEAP		& \verb+0x02700000+ & 473MB - APP\_STACK\\
+		APP\_STACK		& \verb+0x1ffffffc+ & 473MB - APP\_HEAP\\[1ex]
 		\hline
 	\end{tabular}
 	\caption{Pilhas do sistema com seus tamanhos e posições.}
@@ -205,13 +225,6 @@ Restante do mapeamento de memória:
 
 
 \section{Porte do Controlador de Interrupções}
-
-%falar sobre os handlers, qual a sequência de chamadas de função
-%int_vector
-%os diferentes tipos de interrupção (abort, prefetch...), dar exemplos de quando são gerados
-%ICCIAR and ICCEOI register
-%spurious interruption 1023
-%explicar approach usado em exception.cc
 
 Para se usar o controlador de interrupções (que será referenciado como GIC no restante desta seção, de \emph{Generic Interrupt Controller}), é necessário antes inicializar o distribuidor de interrupções e as interfaces dos processadores.
 
@@ -230,7 +243,7 @@ A interface dos processadores é por onde os processadores se comunicam com o GI
 
 Na inicialização do distribuidor, através dos registradores mapeados em memória de configuração do mesmo, é definido, para cada uma das possíveis interrupções, se elas são \emph{level-sensitive} ou \emph{edge-triggered}.
 Em seguida configura-se a prioridade de cada interrupção. A princípio todas as interrupções foram definidas como tendo a mesma prioridade, mas isto é configurável caso necessário.
-É configurado então o processador-alvo de cada interrupção, isto é, para quais interfaces de processador uma determinada interrupção será encaminhada. Finalmente então são ativadas as interrupções.
+É configurado então o processador-alvo de cada interrupção, isto é, para quais interfaces de processador uma determinada interrupção será encaminhada. Finalmente então são ativadas as interrupções \cite{gic}.
 
 A inicialização da interface do processador é mais simples. Primeiro se configura a máscara de prioridade da CPU, isto é, qual é o nível de prioridade mínimo que uma interrupção precisa ter para interromper aquele processador. Na implementação, esta máscara está desativada. Depois configura-se a política de grupos de preempção. No GIC é possível separar interrupções em grupos de preempção, onde se define se determinado grupo pode preemptar determinado outro grupo. Todas as interrupções foram colocadas no mesmo grupo e interrupções podem ser preemptadas.
 
@@ -315,3 +328,142 @@ Com o número da interrupção em mãos, pode-se então chamar o tratador daquel
 
 
 Normalmente, interrupções de \emph{timer} são o tipo mais frequente de interrupção durante a execução do sistema. Dele dependem o escalonador de processos (ou \emph{threads}), Delay, Chronometer e Alarm. Como mencionado na seção do porte do \emph{timer}, uma mesma interrupção pode gerar a chamada de mais de um handler, como a do \emph{timer} que chama a do Alarm e do escalonador. Com isto fica ilustrado que uma única interrupção pode gerar a chamada de vários tratadores para esta mesma interrupção.
+
+
+
+
+\section{MMU}
+
+%nice image in p.87 ug585
+
+%na inicialização, é liberada toda a memória, colocando ela numa lista
+%MMU é inteiramente controlada pelo coprocessador CP15
+%http://www.slideshare.net/prabindh/enabling-two-level-translation-tables-in-armv7-mmu
+%http://www.embedded-bits.co.uk/2011/mmucode/
+%http://lxr.free-electrons.com/source/arch/arm/mm/proc-v7-2level.S?a=arm
+
+
+%primeiro explica o motivo de existência da tabela né. diz que ela fica em alguma posição predeterminada da memória e que deve ser populada
+%depois de dizer que ela deve ser populada, deve-se explicar o formato em baixo níve de cada página, para explicar com o que se está populando aquela tabela. depois disso a mmu traduz automagicamente.
+%Como popular? não vou fazer 1-1 =p
+
+%a mmu é toda controlada pelo coprocessador cp15, assim como lá existe alguns registradores que guardam informaçõos como o registrador que quarda o endereço base da TTB (translation table base) TTBR0 é o registrador da TT L1. (ARM ARM 1387). TTBR1 é para o SO e não muda durante troca de contexto.
+%proteção de memória é feita pois pode-se mexer nos bits de dominio e tal, e cada thread possui um contexto e uma tabela mmu diferente, wtf.
+
+%formato da l1 e l2 entries arm arm p.1282.
+
+
+As principais funções de uma MMU (\emph{Memory Managemend Unit}) são proteção de memória, ou seja, de não permitir acesso a certas regiões da memória por processos/threads não autorizados, e de fazer o mapeamento de memória virtual para memória física, mapeamento este que facilita a escrita de aplicações já que o desenvolvedor dela não precisará estar ciente de como a memória é mapeada internamente pelo sistema operacional.
+
+A MMU consegue cumprir estes dois objetivos (e outros mais) através do uso de uma tabela de tradução de página (que chamaremos de TTP), onde, a grosso modo, cada linha desta tabela é indexada pelo valor do endereço virtual, e na entrada correspondente há o endereço físico assim como \emph{flags} que indicam, dentre outras coisas, se aquela região pode ou não ser acessada pela aplicação corrente.
+
+Esta tabela é salva na memória principal (RAM) do sistema, e configurar a MMU significa especialmente criar métodos para gerenciar e popular esta tabela. Para entender como isto é feito, será explicado agora como é estruturada esta tabela, como que ocorre a tradução de memória virtual para física, e o que cada entrada da tabela deve ter.
+
+\subsection{Estrutura da Tabela de Tradução de Página}
+
+Há, na realidade, mais que somente uma TTP. A TTP possui dois níveis, portanto, desconsiderando-se a TLB, é necessário dois acessos à TTB para se traduzir um endereço, caso configurado para páginas de 4 KB. a MMU suporta páginas de 4 KB e 64 KB, assim como seções de 1 MB e 16 MB. Como cada endereço virtual corresponde à exatamente uma entrada na TTP, usar páginas grandes reduz o tamanho da TTP (consequentemente o uso de memória por ela), entretanto usar páginas menores (4 KB) melhoram muito a eficiência da alocação dinâmica de memória e desfragmentação \cite[p.~77]{ug585.1.7}, porém mapear um espaço de 4 GB exigiria milhões de entradas na tabela. Foi justamente para conciliar estes fatores, que decidiu-se por uma tabela de dois níveis, como será melhor ilustrado a seguir.
+
+A tabela de tradução páginas nível um (TTP1), também chamada de ``\emph{master table}'', divide todo o espaço de endereçamento de 4 GB em 4096 seções de 1 MB, portanto, como cada entrada desta tabela tem o tamanho de uma palavra, seu tamanho total em memória é de $4 \times 4096 = 16$ KB. Os 2 bits menos significativos (lsb) de cada entrada desta tabela, definem que tipo de entrada ela é, que pode ser um dos 4 tipos:
+
+\begin{itemize}
+	\item Bits 00: É uma ``fault entry'', e gera uma exceção do tipo \emph{prefetch} ou \emph{data abort}, dependendo do tipo de acesso. Este tipo de entrada indica que não há mapeamento virtual para esta região.
+	\item Bits lsb 01: Indica a posição de memória para uma tabela de páginas (nível 2).
+	\item Bits lsb 10 com bit 18 em 0: Aponta para uma seção de 1 MB.
+	\item Bits lsb 10 com bit 18 em 1: Indica uma seção de 16 MB, este tipo de entrada exige 16 posições na TTB1.
+	\item Bits lsb 11: Reservado, gera faltas de tradução e não deve ser usado.
+\end{itemize}
+
+A figura \ref{img:l1_entry} ilustra o formato de uma entrada da TTP1. NS significa \emph{non-secure}, e só tem semantica com extenções de segurança habilitadas (fora do escopo do trabalho). SBZ significa \emph{should be zero}. Bits C, B, TEX e AP serão explicados após a explicação do formato de uma entrada da TTP2, pois esta tem campos análogos.
+
+\begin{figure}[hb!]
+    \centering
+    \includegraphics[width=9cm]{figuras/l1_entry}
+    \caption{Divisão lógica do GIC.}
+    \label{img:l1_entry}
+\end{figure}
+
+Vamos agora entender como se traduz de um endereço virtual, para uma TTP2. No coprocessador CP15, existe um registrador chamado TTBR (dois na realidade, TTBR0 e TTBR1), sigla de \emph{Translate Table Base Register}, onde é guardado o endereço da primeira posição da TTP1. Com a MMU ligada, quando há um acesso à memória, automaticamente a MMU pulará para a posição indicada no TTBR, e indexará esta tabela usando os 12 bits mais significativos do endereço virtual. A maneira exata de como é feito este cálculo é mostrada na figura \ref{fig:translation}.
+
+Na posição de memória encontrada no passo anterior, estará uma entrada da TTP1 no formato indicado na figura \ref{fig:l1_entry}. No caso de uma entrada que indica uma outra TTP, os primeiros 22 bits indicam o endereço onde estará esta tabela, com os demais bits em 0, com exceção do último e os do campo de domínio (que será explicado a seguir). Com estas informações, a MMU já pode localizar a posição da TTP2. Para saber qual das entradas da TTP2 deve ser selecionada, é usado os bits [19:12] do endereço virtual para indexar a TTP2.
+
+Os 4 bits do campo de domínio indicam em qual dos possíveis 16 domínios de memória aquela região se encontra, um domínio é apenas um conjunto de regiões de memória. A utilidade disto é que se pode, para cada domínio, especificar como será o controle de acesso nele. Cada domínio pode estar configurado (pelo registrador DACR) como um dos três tipos de acesso: \emph{Acesso não permitido}, qualquer acesso a esta região gera uma falta de domínio; \emph{Cliente}, permissões de acesso são verificadas, e podem gerar uma falta de permissão caso; e \emph{Administradores}, onde permissões de acesso não são verificadas.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=9cm]{figuras/translation}
+    \caption{Divisão lógica do GIC.}
+    \label{img:translation}
+\end{figure}
+
+A TTP2 possui 256 entradas, cada uma com o tamanho de uma palavra, logo, cada TTP2 precisa de 1 KB de memória. Note que como uma entrada da TTB1 provê 22 bits para endereçar uma TTP2, esta TTP2 pode efetivamente estar localizada em qualquer região da memória, já que 22 bits são suficientes para indexar qualquer região de 1 KB de memória.
+
+A figura \ref{fig:l2_entry} ilustra como é o formato de uma entrada na TTP2. Os 2 bits menos significativos indicam se a página possui 4 KB, 16 KB ou se a região não está mapeada. Com o endereço de uma entrada da TTP2 em mãos, basta combinar os 20 bits mais significativos desta entrada com os 12 bits menos significativos do endereço virtual, e teremos traduzido o endereço virtual para um físico.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=9cm]{figuras/l2_entry}
+    \caption{Divisão lógica do GIC.}
+    \label{img:l2_entry}
+\end{figure}
+
+Agora vamos discutir o que cada campo de uma entrada da TTP2 significa.
+
+\textbf{AP e APx:} São os bits que codificam o tipo de acesso que aquela porção de memória possui. Estes bits só são checados caso do domínio seja de \emph{Cliente}. Um acesso que não possui as permissões necessárias geram uma exceção do tipo \emph{prefetch} ou \emph{data abort}. APx e AP[2] são sinônimos. A tabela \ref{tab:apx} ilustra os diferentes tipos de acesso que podem ser codificados.
+
+\begin{table}[h]
+	\centering
+	\begin{tabular}{cccccc}
+		\hline \hline
+		APx & AP[1] & AP[0] & Acesso privilegiado & Acesso não privilegiado & Descrição\\[0.5ex]
+		\hline
+		0 & 0 & 0 & Sem acesso & Sem acesso & Gera uma falta de permissão\\
+		0 & 0 & 1 & Escrita/Leitura & Sem acesso & Acesso somente modo privilegiado\\
+		0 & 1 & 0 & Escrita/Leitura & Sem acesso & Acesso somente modo privilegiado\\
+		0 & 1 & 1 & Escrita/Leitura & Sem acesso & Acesso somente modo privilegiado\\
+		1 & 0 & 0 & \~{} 			& \~{}		 & Combinação reservada\\
+		1 & 0 & 1 & Leitura 		& Sem acesso & Leitura somente modo privilegiado\\
+		1 & 1 & 0 & Leitura 		& Leitura	 & Somente leitura\\
+		1 & 1 & 1 & \~{} 			& \~{}		 & Combinação reservada\\[1ex]
+		\hline
+	\end{tabular}
+	\caption{Codificações das permissões de acesso.}
+	\label{tab:apx}
+\end{table}
+
+\textbf{TEX:} Controla políticas de compartilhamento de memória, caso aquela região seja compartilhada.
+\textbf{C e B:} Estes campos combinados controlam a política de ``cacheamento'' daquela região de memória, ou seja, se ela pode ser salva na cache, e se pode, qual o algoritmo a a ser usado, como \emph{write-back} ou \emph{write-though}, e também políticas de \emph{write-allocate}.
+\textbf{S:} Bit que determina que aquela porção de memória é compartilhada entre processadores.
+\textbf{nG:} Responsável pela proteção de memória intraprocessos. Uma região marcada como não global (nG = 1) tem associado à ela um número que o SO atribui a cada processo. Isto permite que a TLP possa ter diferentes mapeamentos simultaneamente sem necessidade de substituir uma entrada.
+\textbf{xN:} Bit que marca a região como não executável. É importante por questões de segurança, já que o \emph{fetch} especulativo de instruções pode ler uma porção de memória que possui dados sensíveis.
+
+
+\subsection{Populando a Tabela}
+
+Agora que sabemos como as TTPs são estruturadas, bem como o formato de cada entrada dela, podemos finalmente popular esta tabela. Há várias estratégias para fazer isto \cite{mmutheory}, dependendo da forma desejada de mapeamento, por exemplo:
+
+\begin{itemize}
+	\item Mapeamento por Demanda: Pode-se fazer com que determinado endereço virtual não possua um mapeamento correspondente a priori, gerando uma exceção que é tratada criando-se uma TTP2 que mapeie aquela área.
+	\item Mapeamento 1 para N: Com o advento do bit nG, é possível também mapear uma mesma área de memória virtual em diferentes áreas da memória física, de modo que quando o escalonador de processos escalona num novo processo (ou \emph{thread}), ele também modifica o mapeamento de memória, deste modo, diferentes processos poderiam usar uma mesma determinada posição de memória virtual.
+	\item Mapeamento 1 para 1: É o mapeamento mais simples possível, de modo que a posição de memória virtual X corresponde a posição de memória física X; foi usado este mapeamento para validação de permissões.
+\end{itemize}
+
+Em um mapeamento 1 para 1, para popular as TTBs, primeiramente, em um loop, itera-se 512 vezes (já que há 512 de RAM), salvando em posições sucessivas de uma determinada região da memória os endereços das TTB2s, levando-se em conta as \emph{flags} acima mencionadas, após as 512 posições, itera-se pelas 3584 posições restantes (4 GB - 512 MB) marcando aquelas regiões como não mapeadas. Feito isto, é necessário também popular cada TTB2 que foi apontada na TTB1, em um processo semelhante. Em um mapeamento por demanda, marca-se as regiões da memória virtual como não mapeadas, com a diferença que, ao invés de apenas abortar o acesso, cria-se dinamicamente aquele mapeamento.
+
+Após feita as tabelas, a MMU está pronta para ser ativada. A MMU é controlada pelo coprocessador CP15, é nele que são guardados os registradores de configuração, endereço base para a TTP, dentre outras funções. Escrevendo-se 1 no bit menos significativo no registrador c1 (SCTLR) deste coprocessador a MMU é ativada.
+
+%memory map?
+
+\section{Multicore}
+
+%Ativar o segundo processador exige poucas linhas de código
+Ao se ligar a placa, apenas a CPU0 executa código, e é função dela fazer as inicializações necessárias para então ligar o segundo processador (CPU1). Inicialmente, o CPU1 executa uma instrução (\verb+wfe+) que o coloca em modo de espera por evento (\emph{Wait for Event Mode}). Para sair deste modo, a CPU0 precisa emitir uma instrução do tipo evento de sistema, \verb+sev+ (\emph{System Event}). Quando a CPU1 recebe este sinal, ele imediatamente executa a instrução que está no endereço 0xfffffff0, localização onde a CPU0 deve previamente ter escrito uma instrução que faça a CPU1 fazer um \verb+jump+ para o ponto de entrada do que se deseja executar com a CPU1. Note que a posição 0xfffffff0 é uma região reservada da memória, e não corresponde à uma posição da RAM (é o mesmo princípio de registradores mapeados em memória).
+
+Isto é suficiente para fazer o segundo processador passar a executar código, entretanto esta é a parte simples, ter dois processadores rodando tem várias implicações sobre como deve ser o \emph{design} de cada componente do sistema, pois agora há a preocupação com coerência e consistência de memória, condições de corrida {\emph{racing conditions}) e etc.
+
+\chapter{Conclusão}
+
+Este trabalho visou descrever como foi feito o porte do sistema operacional EPOS para a Zedboard. Foram explicadas as decisões de projeto feitas, de modo que as próximas pessoas que venham a portar o EPOS para outra arquitetura, possam entender o raciocínio por trás do que foi implementado, de modo que o que foi aqui exposto possa ser adaptado para outros contextos.
+
+Foi necessário explicar uma série de especificidades da arquitetura para expor como que é feito o interfaceamento do software com o hardware, e como um sistema operacional pode controlar e configurar componentes de hardware.
+
+Este porte possibilitou novos cenários de aplicação do EPOS, espera-se portanto que isto contribua para estimular novas linhas de pesquisa com este sistema operacional.

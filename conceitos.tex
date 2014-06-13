@@ -164,7 +164,7 @@ Há duas situações que geram esta interrupção: Quando se executa instruçõe
 
 \subsection{(\emph{Timers})}
 Cada um dos \emph{cores} possui um \emph{timer} privado de 32 bits e ambos \emph{cores} compartilham um \emph{timer} global de 64 bits. Estes \emph{timers} trabalham numa frequência sempre igual à metade da frequência da CPU.
-No nível de sistema (\emph{sistem-level (PS)}), há dois \emph{timers} triplos, cujas frequências são sempre um quarto ou um sexo da frequência da CPU.
+No nível de sistema (\emph{sistem-level (PS)}), há dois grupos independentes de \emph{timers}, cada grupo com 3 \emph{timers}.
 
 
 
@@ -172,7 +172,7 @@ No nível de sistema (\emph{sistem-level (PS)}), há dois \emph{timers} triplos,
 \subsection{\emph{Clocks}}
 
 %30 <= PS_CLK <= 60MHZ
-O \emph{clock} principal do sistema, chamado aqui de PS\_CLK (\emph{Processing System Clock}), é responsável por alimentar as 3 PLLs\footnote{\emph{Phase-Locked Loop}. É um sistema de controle que gera uma saída cuja fase é relacionada à fase do sinal de entrada. Pode ser usada para estabilizar um sinal e também multiplica-lo.} do sistema, sendo cada uma dessas PLLs responsável por uma parte diferente do sistema \cite[p.~622]{ug585}. O PS\_CLK é um \emph{clock} de baixa frequência, ficando entre 30 a 60 MHz (PS\_CLK é igual a 33.33 MHz no caso da Zedboard), sendo este multiplicado por cada uma das 3 PLLs para que o sistema funcione com velocidades maiores\footnote{Este clock pode ser multiplicado por um número de 1 a 127, e é multiplicado por 26 por padrão.}. As 3 PLLs são:
+O \emph{clock} principal do sistema, chamado aqui de PS\_CLK (\emph{Processing System Clock}), é responsável por alimentar as 3 PLLs\footnote{\emph{Phase-Locked Loop}. É um sistema de controle que gera uma saída cuja fase é relacionada à fase do sinal de entrada. Pode ser usada para estabilizar um sinal e também multiplica-lo.} do sistema, sendo cada uma dessas PLLs responsável por uma parte diferente do sistema \cite[p.~622]{ug585}. O PS\_CLK é um \emph{clock} de baixa frequência, ficando entre 30 a 60 MHz (PS\_CLK é igual a 33.33 MHz no caso da Zedboard \cite[p.~19]{zed_manual}), sendo este multiplicado por cada uma das 3 PLLs para que o sistema funcione com velocidades maiores\footnote{Este clock pode ser multiplicado por um número de 1 a 127, e é multiplicado por 26 por padrão.}. As 3 PLLs são:
 
 \begin{itemize}
 	\item \textbf{I/O PLL:} Responsável por produzir o sinal de \emph{clock} para os dispositivos de entrada e saída.
@@ -238,11 +238,12 @@ A MMU (\emph{Memory Managemed Unit}) é um componente responsável por gerenciar
 \section{Ambiente de Desenvolvimento}
 
 O ambiente de desenvolvimento usado para o porte foi o qemu para ARM (\verb+qemu-system-arm+), para executar o EPOS num ambiente virtualizado (emulado), pois assim pode-se usar ferramentas como o GDB para a depuração do código. O uso do GDB foi fundamental para o desenvolvimento, já que com ele era possível imprimir o valor de cada registrador em um dado ponto da execução, verificar a memória, executar instruções específicas e etc. Para compilar o EPOS foi usado \emph{cross-compilers} para ARM. As flags usadas para criar um ambiente de depuração com o qemu e o GDB foram as sequintes (com cada comando feito em um terminal diferente):
+\hspace*{-1.0cm}\vbox{
 \begin{verbatim}
-	qemu-system-arm -no-reboot -nographic -s -S -machine xilinx-zynq-a9\
-	-cpu cortex-a9 -kernel ./img/zynq_app -fda ./img/zynq_app.img
+qemu-system-arm -no-reboot -nographic -s -S -machine xilinx-zynq-a9\
+-cpu cortex-a9 -kernel ./img/zynq_app -fda ./img/zynq_app.img
 
-	arm-none-eabi-gdb -ex "target remote :1234"
+arm-none-eabi-gdb -ex "target remote :1234"
 \end{verbatim}
-
+}
 O hardware real também estava disponível, e foi usado quando quando o qemu não produzia resultados confiáveis. Com o hardware real, para a depuração do código foi usado o JTAG.
