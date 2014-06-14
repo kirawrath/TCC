@@ -5,11 +5,23 @@
 
 Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões tomadas. Antes de entrar nas especificidades de cada componente, é interessante colocar aqui alguns conceitos comuns que são usados em cada mediador.
 
+A grosso modo, o processo de inicialização da CPU envolve \cite[p.~110]{ug585.1.7}:
+\begin{enumerate}
+	\item Definir a tabela de vetores.
+	\item Invalidar \emph{caches}, TLB, \emph{branch predictor}
+	\item Preparar tabelas de tradução de página.
+	\item Configurar as pilhas dos diferentes modos de execução.
+	\item Carregar o endereço base da tabela de páginas no registrador apropriado para ser usado pela MMU.
+	\item Ativar a MMU.
+	\item Ativar a L2, ativar a L1.
+	\item Pular para o ponto de entrada a aplicação.
+\end{enumerate}
+
+Estes e outros passos (como inicialização do GIC) são explicados em detalhe nas seções que seguem.
+
 \section{Registradores Mapeados em Memória}
 A maneira usada para se comunicar, configurar e ler o estado de um dado componente de hardware é através da leitura e/ou escrita em registradores mapeados em memória. Um registrador mapeado em memória basicamente é uma região fixa da memória, onde uma escrita naquela posição indica uma escrita no registrador lá mapeado.
 Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, responsável por indicar quantos ciclos\footnote{Na realidade é o número de baud\_samples que se passaram.} a UART deve esperar um novo caractere chegar antes de emitir uma interrupção de \emph{timeout}. Este registrador está mapeado na posição de memória 0xE000001C para a UART0. Portanto, para configurar que o número de ciclos esperado seja de 20, basta escrever este número naquela posição. Uma maneira de fazer esta escrita, por exemplo, em C/C++, é: \verb+*((unsigned long*)0xE000001C) = 20;+.
-
-%\section{memory map}
 
 %\section{Boot}
 
@@ -36,12 +48,14 @@ template<bool condition, typename Then, typename Else> struct IF
 
 Este template, a princípio, nada mais faz do que tomar 3 parâmetros e então criar um tipo chamado \verb+Result+ igual ao segundo parâmetro, contudo, se fizermos uma especialização deste template, ele passa ser útil:
 
+\hspace*{-1.5cm}\vbox{
 \begin{verbatim}
 template<typename Then, typename Else> struct IF<false, Then, Else>
 {
     typedef Else Result;
 };
 \end{verbatim}
+}
 
 Com esta especialização, toda vez que o primeiro parâmetro resolver-se como falso, \verb+Result+ será definido como o terceiro parâmetro. Temos, portanto, um \verb+if+ metaprogramado funcional, agora voltemos ao exemplo do chronometro.
 
@@ -108,6 +122,8 @@ O construtor do \verb+Zynq_Timer+ recebe como parâmetro a frequência que o con
 
 A classe \verb+Zynq_Timer+ possui um atributo estático (e portanto único para todas as instâncias) definido como \verb+Zynq_Timer*+ \verb+_channels[CHANNELS]+, onde \verb+CHANNELS+ é uma constante com o número de diferentes classes usando o \emph{timer} (Scheduler e Alarm). Este vetor é necessário pois, quando uma interrupção de \emph{timer} acontece e o \emph{handler} do \emph{timer} é chamado, este \emph{handler} pode iterar sobre ele, chamando todos os respectivos \emph{handlers} daquelas classes. Abaixo segue um exemplo de código de como isto pode ser feito:
 
+
+\label{int_handler}
 \begin{verbatim}
 Zynq_Timer * Zynq_Timer::_channels[CHANNELS];
 
@@ -255,47 +271,49 @@ O processador, ao receber uma interrupção, (portanto as interrupções estão 
 
 O principal tratador é o tratador de interrupções IRQ (\verb+irc_handler+), sendo que este precisa ser discutido com mais profundidade. Abaixo segue o código deste tratador:
 
+\hspace*{-1cm}\vbox{
 \begin{verbatim}
- 43 void _irq_handler() {
- 44   ASMV(
- 45   // A few definitions
- 46   ".equ ARM_MODE_FIQ,      0x11 \n"
- 47   ".equ ARM_MODE_IRQ,      0x12 \n"
- 48   ".equ ARM_MODE_SVC,      0x13 \n"
- 49   ".equ IRQ_BIT,           0x80 \n"
- 50   ".equ FIQ_BIT,           0x40 \n"
- 51 
- 52   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT \n" // go to SVC
- 53   // save current context (lr, sp and spsr are banked registers)
- 54   "stmfd sp!, {r0-r3,r12,lr,pc}\n"
- 55 
- 56   "msr cpsr_c, #ARM_MODE_IRQ | IRQ_BIT | FIQ_BIT\n" //go to IRQ
- 57 
- 58   "sub r0, lr, #4 \n" // return from irq addr
- 59   "mrs r1, spsr   \n" // pass irq_spsr to svc r1
- 60 
- 61   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT\n"//go back to SVC
- 62   "add r2, sp, #24 \n"  // sp+24 is the position of the saved pc
- 63   
- 64   // save return address into the pc position
- 65   "str r0, [r2] \n" 
- 66   "stmfd sp!, {r1} \n"   // save irq-spsr
- 67       
- 68   );    
- 69   
- 70     
- 71   IC::int_handler();
- 72     
- 73   ASMV(        
- 74   "ldmfd sp!, {r0}              \n"
- 75   "msr spsr_cfxs, r0\n"//restore IRQ's spsr value
- 76                        //to SVC's spsr             
- 77   "ldmfd sp!, {r0-r3,r12,lr,pc}^ \n" // restore context
- 78   //the ^ in the end of the above instruction makes the 
- 79   //spsr to be restored into svc_cpsr
- 80   );
- 81 }
+43 void _irq_handler() {
+44   ASMV(
+45   // A few definitions
+46   ".equ ARM_MODE_FIQ,      0x11 \n"
+47   ".equ ARM_MODE_IRQ,      0x12 \n"
+48   ".equ ARM_MODE_SVC,      0x13 \n"
+49   ".equ IRQ_BIT,           0x80 \n"
+50   ".equ FIQ_BIT,           0x40 \n"
+51 
+52   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT \n" // go to SVC
+53   // save current context (lr, sp and spsr are banked registers)
+54   "stmfd sp!, {r0-r3,r12,lr,pc}\n"
+55 
+56   "msr cpsr_c, #ARM_MODE_IRQ | IRQ_BIT | FIQ_BIT\n" //go to IRQ
+57 
+58   "sub r0, lr, #4 \n" // return from irq addr
+59   "mrs r1, spsr   \n" // pass irq_spsr to svc r1
+60 
+61   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT\n"//go back to SVC
+62   "add r2, sp, #24 \n"  // sp+24 is the position of the saved pc
+63   
+64   // save return address into the pc position
+65   "str r0, [r2] \n" 
+66   "stmfd sp!, {r1} \n"   // save irq-spsr
+67       
+68   );    
+69   
+70     
+71   IC::int_handler();
+72     
+73   ASMV(        
+74   "ldmfd sp!, {r0}              \n"
+75   "msr spsr_cfxs, r0\n"//restore IRQ's spsr value
+76                        //to SVC's spsr             
+77   "ldmfd sp!, {r0-r3,r12,lr,pc}^ \n" // restore context
+78   //the ^ in the end of the above instruction makes the 
+79   //spsr to be restored into svc_cpsr
+80   );
+81 }
 \end{verbatim}
+}
 
 Após selecionar qual handler chamar, o processador muda de modo, indo, no caso de uma interrupção IRQ, para o modo de execução IRQ. Neste modo há 3 registradores banqueados: O SPSR, que contém o valor do registrador CPSR imediatamente antes da interrupção, sendo necessário para que seja possível restaurar o valor original do CPSR após tratar a interupção; o LR (\emph{link register}), que contém o endereço da próxima instrução que seria executada imediatamente antes da interrupção mais 4; e, finalmente, o SP (\emph{stack pointer}), que aponta para a pilha própria desde modo (cada modo pode possuir sua própria pilha).
 
@@ -343,15 +361,6 @@ Normalmente, interrupções de \emph{timer} são o tipo mais frequente de interr
 %http://lxr.free-electrons.com/source/arch/arm/mm/proc-v7-2level.S?a=arm
 
 
-%primeiro explica o motivo de existência da tabela né. diz que ela fica em alguma posição predeterminada da memória e que deve ser populada
-%depois de dizer que ela deve ser populada, deve-se explicar o formato em baixo níve de cada página, para explicar com o que se está populando aquela tabela. depois disso a mmu traduz automagicamente.
-%Como popular? não vou fazer 1-1 =p
-
-%a mmu é toda controlada pelo coprocessador cp15, assim como lá existe alguns registradores que guardam informaçõos como o registrador que quarda o endereço base da TTB (translation table base) TTBR0 é o registrador da TT L1. (ARM ARM 1387). TTBR1 é para o SO e não muda durante troca de contexto.
-%proteção de memória é feita pois pode-se mexer nos bits de dominio e tal, e cada thread possui um contexto e uma tabela mmu diferente, wtf.
-
-%formato da l1 e l2 entries arm arm p.1282.
-
 
 As principais funções de uma MMU (\emph{Memory Managemend Unit}) são proteção de memória, ou seja, de não permitir acesso a certas regiões da memória por processos/threads não autorizados, e de fazer o mapeamento de memória virtual para memória física, mapeamento este que facilita a escrita de aplicações já que o desenvolvedor dela não precisará estar ciente de como a memória é mapeada internamente pelo sistema operacional.
 
@@ -361,25 +370,25 @@ Esta tabela é salva na memória principal (RAM) do sistema, e configurar a MMU 
 
 \subsection{Estrutura da Tabela de Tradução de Página}
 
-Há, na realidade, mais que somente uma TTP. A TTP possui dois níveis, portanto, desconsiderando-se a TLB, é necessário dois acessos à TTB para se traduzir um endereço, caso configurado para páginas de 4 KB. a MMU suporta páginas de 4 KB e 64 KB, assim como seções de 1 MB e 16 MB. Como cada endereço virtual corresponde à exatamente uma entrada na TTP, usar páginas grandes reduz o tamanho da TTP (consequentemente o uso de memória por ela), entretanto usar páginas menores (4 KB) melhoram muito a eficiência da alocação dinâmica de memória e desfragmentação \cite[p.~77]{ug585.1.7}, porém mapear um espaço de 4 GB exigiria milhões de entradas na tabela. Foi justamente para conciliar estes fatores, que decidiu-se por uma tabela de dois níveis, como será melhor ilustrado a seguir.
+A TTP possui dois níveis, portanto, desconsiderando-se a TLB, é necessário dois acessos à TTB para se traduzir um endereço, caso configurado para páginas de 4 KB. a MMU suporta páginas de 4 KB e 64 KB, assim como seções de 1 MB e 16 MB. Como cada endereço virtual corresponde à exatamente uma entrada na TTP, usar páginas grandes reduz o tamanho da TTP (consequentemente o uso de memória por ela), entretanto usar páginas menores (4 KB) melhoram muito a eficiência da alocação dinâmica de memória e desfragmentação \cite[p.~77]{ug585.1.7}, porém mapear um espaço de 4 GB exigiria milhões de entradas na tabela. Foi justamente para conciliar estes fatores, que decidiu-se por uma tabela de dois níveis, como será melhor ilustrado a seguir.
 
 A tabela de tradução páginas nível um (TTP1), também chamada de ``\emph{master table}'', divide todo o espaço de endereçamento de 4 GB em 4096 seções de 1 MB, portanto, como cada entrada desta tabela tem o tamanho de uma palavra, seu tamanho total em memória é de $4 \times 4096 = 16$ KB. Os 2 bits menos significativos (lsb) de cada entrada desta tabela, definem que tipo de entrada ela é, que pode ser um dos 4 tipos:
 
 \begin{itemize}
-	\item Bits 00: É uma ``fault entry'', e gera uma exceção do tipo \emph{prefetch} ou \emph{data abort}, dependendo do tipo de acesso. Este tipo de entrada indica que não há mapeamento virtual para esta região.
+	\item Bits lsb 00: É uma ``fault entry'', e gera uma exceção do tipo \emph{prefetch} ou \emph{data abort}, dependendo do tipo de acesso. Este tipo de entrada indica que não há mapeamento virtual para esta região.
 	\item Bits lsb 01: Indica a posição de memória para uma tabela de páginas (nível 2).
 	\item Bits lsb 10 com bit 18 em 0: Aponta para uma seção de 1 MB.
 	\item Bits lsb 10 com bit 18 em 1: Indica uma seção de 16 MB, este tipo de entrada exige 16 posições na TTB1.
 	\item Bits lsb 11: Reservado, gera faltas de tradução e não deve ser usado.
 \end{itemize}
 
-A figura \ref{img:l1_entry} ilustra o formato de uma entrada da TTP1. NS significa \emph{non-secure}, e só tem semantica com extenções de segurança habilitadas (fora do escopo do trabalho). SBZ significa \emph{should be zero}. Bits C, B, TEX e AP serão explicados após a explicação do formato de uma entrada da TTP2, pois esta tem campos análogos.
+A figura \ref{fig:l1_entry} ilustra o formato de uma entrada da TTP1. NS significa \emph{non-secure}, e só tem semantica com extenções de segurança habilitadas (fora do escopo do trabalho). SBZ significa \emph{should be zero}. Bits C, B, TEX e AP serão explicados após a explicação do formato de uma entrada da TTP2, pois esta tem campos análogos.
 
 \begin{figure}[hb!]
     \centering
     \includegraphics[width=9cm]{figuras/l1_entry}
-    \caption{Divisão lógica do GIC.}
-    \label{img:l1_entry}
+    \caption{Formato de uma entrada da tabela de tradução de páginas nível 1.}
+	\label{fig:l1_entry}
 \end{figure}
 
 Vamos agora entender como se traduz de um endereço virtual, para uma TTP2. No coprocessador CP15, existe um registrador chamado TTBR (dois na realidade, TTBR0 e TTBR1), sigla de \emph{Translate Table Base Register}, onde é guardado o endereço da primeira posição da TTP1. Com a MMU ligada, quando há um acesso à memória, automaticamente a MMU pulará para a posição indicada no TTBR, e indexará esta tabela usando os 12 bits mais significativos do endereço virtual. A maneira exata de como é feito este cálculo é mostrada na figura \ref{fig:translation}.
@@ -391,8 +400,8 @@ Os 4 bits do campo de domínio indicam em qual dos possíveis 16 domínios de me
 \begin{figure}[h]
     \centering
     \includegraphics[width=9cm]{figuras/translation}
-    \caption{Divisão lógica do GIC.}
-    \label{img:translation}
+    \caption{Processo de tradução de memória virtual para física.}
+    \label{fig:translation}
 \end{figure}
 
 A TTP2 possui 256 entradas, cada uma com o tamanho de uma palavra, logo, cada TTP2 precisa de 1 KB de memória. Note que como uma entrada da TTB1 provê 22 bits para endereçar uma TTP2, esta TTP2 pode efetivamente estar localizada em qualquer região da memória, já que 22 bits são suficientes para indexar qualquer região de 1 KB de memória.
@@ -402,19 +411,20 @@ A figura \ref{fig:l2_entry} ilustra como é o formato de uma entrada na TTP2. Os
 \begin{figure}[h]
     \centering
     \includegraphics[width=9cm]{figuras/l2_entry}
-    \caption{Divisão lógica do GIC.}
-    \label{img:l2_entry}
+    \caption{Processo de tradução de memória virtual para física.}
+    \label{fig:l2_entry}
 \end{figure}
 
 Agora vamos discutir o que cada campo de uma entrada da TTP2 significa.
 
 \textbf{AP e APx:} São os bits que codificam o tipo de acesso que aquela porção de memória possui. Estes bits só são checados caso do domínio seja de \emph{Cliente}. Um acesso que não possui as permissões necessárias geram uma exceção do tipo \emph{prefetch} ou \emph{data abort}. APx e AP[2] são sinônimos. A tabela \ref{tab:apx} ilustra os diferentes tipos de acesso que podem ser codificados.
 
+%\hspace*{-1cm}\vbox{
 \begin{table}[h]
-	\centering
-	\begin{tabular}{cccccc}
+	%\centering
+	\hskip-2.2cm\begin{tabular}{cccccc}
 		\hline \hline
-		APx & AP[1] & AP[0] & Acesso privilegiado & Acesso não privilegiado & Descrição\\[0.5ex]
+		APx & AP[1] & AP[0] & Privilegiado & Não Privilegiado & Descrição\\[0.5ex]
 		\hline
 		0 & 0 & 0 & Sem acesso & Sem acesso & Gera uma falta de permissão\\
 		0 & 0 & 1 & Escrita/Leitura & Sem acesso & Acesso somente modo privilegiado\\
@@ -429,6 +439,7 @@ Agora vamos discutir o que cada campo de uma entrada da TTP2 significa.
 	\caption{Codificações das permissões de acesso.}
 	\label{tab:apx}
 \end{table}
+%}
 
 \textbf{TEX:} Controla políticas de compartilhamento de memória, caso aquela região seja compartilhada.
 \textbf{C e B:} Estes campos combinados controlam a política de ``cacheamento'' daquela região de memória, ou seja, se ela pode ser salva na cache, e se pode, qual o algoritmo a a ser usado, como \emph{write-back} ou \emph{write-though}, e também políticas de \emph{write-allocate}.
@@ -455,10 +466,12 @@ Após feita as tabelas, a MMU está pronta para ser ativada. A MMU é controlada
 
 \section{Multicore}
 
-%Ativar o segundo processador exige poucas linhas de código
 Ao se ligar a placa, apenas a CPU0 executa código, e é função dela fazer as inicializações necessárias para então ligar o segundo processador (CPU1). Inicialmente, o CPU1 executa uma instrução (\verb+wfe+) que o coloca em modo de espera por evento (\emph{Wait for Event Mode}). Para sair deste modo, a CPU0 precisa emitir uma instrução do tipo evento de sistema, \verb+sev+ (\emph{System Event}). Quando a CPU1 recebe este sinal, ele imediatamente executa a instrução que está no endereço 0xfffffff0, localização onde a CPU0 deve previamente ter escrito uma instrução que faça a CPU1 fazer um \verb+jump+ para o ponto de entrada do que se deseja executar com a CPU1. Note que a posição 0xfffffff0 é uma região reservada da memória, e não corresponde à uma posição da RAM (é o mesmo princípio de registradores mapeados em memória).
 
 Isto é suficiente para fazer o segundo processador passar a executar código, entretanto esta é a parte simples, ter dois processadores rodando tem várias implicações sobre como deve ser o \emph{design} de cada componente do sistema, pois agora há a preocupação com coerência e consistência de memória, condições de corrida {\emph{racing conditions}) e etc.
+
+	Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, assim como seu\emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como mostrado na seção anterior.
+
 
 \chapter{Conclusão}
 

@@ -64,7 +64,7 @@ Como já citado, o Zynq 7000 possui um processador \emph{dual core} Cortex A9, c
 
 \subsection{Modos de Operação}
 \label{sec:operating_modes}
-A arquitetura ARMv7 conta com 9 modos de operação (7 por padrão, mais 2 com extensões habilidadas), sendo que o único modo não privilegiado é o modo de usuário, os demais modos padrão possuem o mesmo privilégio dentro do sistema\footnote{O modo hipervisor possui certas funções que os demais modos não oferecem, mas no que diz respeito à acesso a memória e execução de instruções, ainda é o mesmo privilégio}. A principal diferença entre um modo e outro é que cada modo conta com um certo subconjunto privado de registradores banqueados, visiveis somente no modo em vigência, como ilustra a imagem \ref{fig:banked}. A tabela \ref{processormode} ilustra quais são os modos de operação disponíveis \cite[p.~1139]{armarm}.
+A arquitetura ARMv7 conta com 9 modos de operação (7 por padrão, mais 2 com extensões habilidadas), sendo que o único modo não privilegiado é o modo de usuário, os demais modos padrão possuem o mesmo privilégio dentro do sistema\footnote{O modo hipervisor possui certas funções que os demais modos não oferecem, mas no que diz respeito à acesso a memória e execução de instruções, ainda é o mesmo privilégio}. A principal diferença entre um modo e outro é que cada modo conta com um certo subconjunto privado de registradores banqueados, visiveis somente no modo em vigência, como ilustra a imagem \ref{fig:banked}. A tabela \ref{tab:processormode} ilustra quais são os modos de operação disponíveis \cite[p.~1139]{armarm}.
 O campo ``Codificação'' é usado no registrador CPSR para se verificar ou modificar o modo de operação vigente.
 
 \begin{table}[ht]
@@ -86,7 +86,7 @@ System & 11111 & Sempre\\[1ex]
 \hline %inserts single line
 \end{tabular}
 \caption{Modos do processador. Codificação corresponde aos bits CPSR[4:0].}
-\label{tab.processormode} % is used to refer this table in the text
+\label{tab:processormode} % is used to refer this table in the text
 \end{table}
 
 \textbf{Modo Usuário:} Modo não-privilegiado de execução. Neste modo somente é possível de se fazer acesso não privilegiado aos recursos do hardware (não prodendo acessar as áreas protegidas). Não é possível de se mudar para outro modo de operação quando neste, a não ser por eventos externos como interrupções.
@@ -160,7 +160,7 @@ Há duas situações que geram esta interrupção: Quando se executa instruçõe
 
 
 %Source: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0068b/BABFCEEG.html
-\textbf{Interrupção de Software: } Existe uma instrução no assembly do ARMv9 que permite que seja feita uma interrupção de software (\verb+swi+). Esta instrução pode ser acompanhada de um número de 8 bits, significando que é possível se criar 256 interrupções de software diferentes. Esta interrupção leva ao modo supervisor.
+\textbf{Interrupção de Software: } Existe uma instrução no assembly do ARMv7 que permite que seja feita uma interrupção de software (\verb+swi+). Esta instrução pode ser acompanhada de um número de 8 bits. Esta interrupção leva ao modo supervisor.
 
 \subsection{(\emph{Timers})}
 Cada um dos \emph{cores} possui um \emph{timer} privado de 32 bits e ambos \emph{cores} compartilham um \emph{timer} global de 64 bits. Estes \emph{timers} trabalham numa frequência sempre igual à metade da frequência da CPU.
