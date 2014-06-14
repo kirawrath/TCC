@@ -362,27 +362,27 @@ Normalmente, interrupções de \emph{timer} são o tipo mais frequente de interr
 
 
 
-As principais funções de uma MMU (\emph{Memory Managemend Unit}) são proteção de memória, ou seja, de não permitir acesso a certas regiões da memória por processos/threads não autorizados, e de fazer o mapeamento de memória virtual para memória física, mapeamento este que facilita a escrita de aplicações já que o desenvolvedor dela não precisará estar ciente de como a memória é mapeada internamente pelo sistema operacional.
+As principais funções de uma MMU (\emph{Memory Managemend Unit}) são proteção de memória, ou seja, não permitir acesso a certas regiões da memória por processos não autorizados, e de fazer o mapeamento de memória virtual para memória física, mapeamento este que facilita a escrita de aplicações já que o desenvolvedor dela não precisará estar ciente de como a memória é mapeada internamente pelo sistema operacional.
 
-A MMU consegue cumprir estes dois objetivos (e outros mais) através do uso de uma tabela de tradução de página (que chamaremos de TTP), onde, a grosso modo, cada linha desta tabela é indexada pelo valor do endereço virtual, e na entrada correspondente há o endereço físico assim como \emph{flags} que indicam, dentre outras coisas, se aquela região pode ou não ser acessada pela aplicação corrente.
+A MMU consegue cumprir estes dois objetivos (e outros mais) através do uso de uma tabela de tradução de páginas (que chamaremos de TTP), onde, a grosso modo, cada linha desta tabela é indexada pelo valor do endereço virtual, e na entrada correspondente há o endereço físico assim como \emph{flags} que indicam, dentre outras coisas, se aquela região pode ou não ser acessada pela aplicação em execução.
 
 Esta tabela é salva na memória principal (RAM) do sistema, e configurar a MMU significa especialmente criar métodos para gerenciar e popular esta tabela. Para entender como isto é feito, será explicado agora como é estruturada esta tabela, como que ocorre a tradução de memória virtual para física, e o que cada entrada da tabela deve ter.
 
 \subsection{Estrutura da Tabela de Tradução de Página}
 
-A TTP possui dois níveis, portanto, desconsiderando-se a TLB, é necessário dois acessos à TTB para se traduzir um endereço, caso configurado para páginas de 4 KB. a MMU suporta páginas de 4 KB e 64 KB, assim como seções de 1 MB e 16 MB. Como cada endereço virtual corresponde à exatamente uma entrada na TTP, usar páginas grandes reduz o tamanho da TTP (consequentemente o uso de memória por ela), entretanto usar páginas menores (4 KB) melhoram muito a eficiência da alocação dinâmica de memória e desfragmentação \cite[p.~77]{ug585.1.7}, porém mapear um espaço de 4 GB exigiria milhões de entradas na tabela. Foi justamente para conciliar estes fatores, que decidiu-se por uma tabela de dois níveis, como será melhor ilustrado a seguir.
+A TTP possui dois níveis, portanto, desconsiderando-se a TLB, é necessário dois acessos à TTB para traduzir um endereço, caso configurado para páginas de 4 KB. a MMU suporta páginas de 4 KB e 64 KB, assim como seções de 1 MB e 16 MB. Como cada endereço virtual corresponde à exatamente uma entrada na TTP, usar páginas grandes reduz o tamanho da TTP (consequentemente o uso de memória por ela), entretanto usar páginas menores (4 KB) melhoram muito a eficiência da alocação dinâmica de memória e desfragmentação \cite[p.~77]{ug585.1.7}, porém mapear um espaço de 4 GB exigiria milhões de entradas na tabela. Foi justamente para conciliar estes fatores, que decidiu-se por uma tabela de dois níveis, como será melhor ilustrado a seguir.
 
-A tabela de tradução páginas nível um (TTP1), também chamada de ``\emph{master table}'', divide todo o espaço de endereçamento de 4 GB em 4096 seções de 1 MB, portanto, como cada entrada desta tabela tem o tamanho de uma palavra, seu tamanho total em memória é de $4 \times 4096 = 16$ KB. Os 2 bits menos significativos (lsb) de cada entrada desta tabela, definem que tipo de entrada ela é, que pode ser um dos 4 tipos:
+A tabela de tradução páginas nível um (TTP1), também chamada de ``\emph{master table}'', divide todo o espaço de endereçamento de 4 GB em 4096 seções de 1 MB, portanto, como cada entrada desta tabela tem o tamanho de uma palavra, seu tamanho total em memória é de $4 \times 4096 = 16$ KB. Os 2 bits menos significativos (lsb) de cada entrada desta tabela, definem que tipo de entrada ela é, que pode ser um dos 5 tipos:
 
 \begin{itemize}
 	\item Bits lsb 00: É uma ``fault entry'', e gera uma exceção do tipo \emph{prefetch} ou \emph{data abort}, dependendo do tipo de acesso. Este tipo de entrada indica que não há mapeamento virtual para esta região.
-	\item Bits lsb 01: Indica a posição de memória para uma tabela de páginas (nível 2).
+	\item Bits lsb 01: Indica a posição de memória de uma tabela de páginas (nível 2).
 	\item Bits lsb 10 com bit 18 em 0: Aponta para uma seção de 1 MB.
 	\item Bits lsb 10 com bit 18 em 1: Indica uma seção de 16 MB, este tipo de entrada exige 16 posições na TTB1.
 	\item Bits lsb 11: Reservado, gera faltas de tradução e não deve ser usado.
 \end{itemize}
 
-A figura \ref{fig:l1_entry} ilustra o formato de uma entrada da TTP1. NS significa \emph{non-secure}, e só tem semantica com extenções de segurança habilitadas (fora do escopo do trabalho). SBZ significa \emph{should be zero}. Bits C, B, TEX e AP serão explicados após a explicação do formato de uma entrada da TTP2, pois esta tem campos análogos.
+A figura \ref{fig:l1_entry} ilustra o formato de uma entrada da TTP1. NS significa \emph{non-secure}, e só tem semântica com extensões de segurança habilitadas (fora do escopo do trabalho). SBZ significa \emph{should be zero}. Bits C, B, TEX e AP serão explicados após a explicação do formato de uma entrada da TTP2, pois esta tem campos análogos.
 
 \begin{figure}[hb!]
     \centering
@@ -391,11 +391,11 @@ A figura \ref{fig:l1_entry} ilustra o formato de uma entrada da TTP1. NS signifi
 	\label{fig:l1_entry}
 \end{figure}
 
-Vamos agora entender como se traduz de um endereço virtual, para uma TTP2. No coprocessador CP15, existe um registrador chamado TTBR (dois na realidade, TTBR0 e TTBR1), sigla de \emph{Translate Table Base Register}, onde é guardado o endereço da primeira posição da TTP1. Com a MMU ligada, quando há um acesso à memória, automaticamente a MMU pulará para a posição indicada no TTBR, e indexará esta tabela usando os 12 bits mais significativos do endereço virtual. A maneira exata de como é feito este cálculo é mostrada na figura \ref{fig:translation}.
+Vamos agora entender como se traduz de um endereço virtual, o endereço de uma TTP2. No coprocessador CP15, existe um registrador chamado TTBR (dois na realidade, TTBR0 e TTBR1), sigla de \emph{Translate Table Base Register}, onde é guardado o endereço da primeira posição da TTP1. Com a MMU ligada, quando há um acesso à memória, automaticamente a MMU pulará para a posição indicada no TTBR, e indexará esta tabela usando os 12 bits mais significativos do endereço virtual. A maneira exata de como é feito este cálculo é mostrada na figura \ref{fig:translation}.
 
 Na posição de memória encontrada no passo anterior, estará uma entrada da TTP1 no formato indicado na figura \ref{fig:l1_entry}. No caso de uma entrada que indica uma outra TTP, os primeiros 22 bits indicam o endereço onde estará esta tabela, com os demais bits em 0, com exceção do último e os do campo de domínio (que será explicado a seguir). Com estas informações, a MMU já pode localizar a posição da TTP2. Para saber qual das entradas da TTP2 deve ser selecionada, é usado os bits [19:12] do endereço virtual para indexar a TTP2.
 
-Os 4 bits do campo de domínio indicam em qual dos possíveis 16 domínios de memória aquela região se encontra, um domínio é apenas um conjunto de regiões de memória. A utilidade disto é que se pode, para cada domínio, especificar como será o controle de acesso nele. Cada domínio pode estar configurado (pelo registrador DACR) como um dos três tipos de acesso: \emph{Acesso não permitido}, qualquer acesso a esta região gera uma falta de domínio; \emph{Cliente}, permissões de acesso são verificadas, e podem gerar uma falta de permissão caso; e \emph{Administradores}, onde permissões de acesso não são verificadas.
+Os 4 bits do campo de domínio indicam em qual dos possíveis 16 domínios de memória aquela região se encontra, um domínio é apenas um conjunto de regiões de memória. A utilidade disto é que se pode, para cada domínio, especificar como será o controle de acesso nele. Cada domínio pode estar configurado (pelo registrador DACR) como um dos três tipos de acesso: \emph{Acesso não permitido}, qualquer acesso a esta região gera uma falta de domínio; \emph{Cliente}, permissões de acesso são verificadas, e podem gerar uma falta de permissão; e \emph{Administradores}, onde permissões de acesso não são verificadas (bits AP e APx são ignorados).
 
 \begin{figure}[h]
     \centering
@@ -455,28 +455,28 @@ Agora que sabemos como as TTPs são estruturadas, bem como o formato de cada ent
 \begin{itemize}
 	\item Mapeamento por Demanda: Pode-se fazer com que determinado endereço virtual não possua um mapeamento correspondente a priori, gerando uma exceção que é tratada criando-se uma TTP2 que mapeie aquela área.
 	\item Mapeamento 1 para N: Com o advento do bit nG, é possível também mapear uma mesma área de memória virtual em diferentes áreas da memória física, de modo que quando o escalonador de processos escalona num novo processo (ou \emph{thread}), ele também modifica o mapeamento de memória, deste modo, diferentes processos poderiam usar uma mesma determinada posição de memória virtual.
-	\item Mapeamento 1 para 1: É o mapeamento mais simples possível, de modo que a posição de memória virtual X corresponde a posição de memória física X; foi usado este mapeamento para validação de permissões.
+	\item Mapeamento 1 para 1: É o mapeamento mais simples possível, de modo que a posição de memória virtual X corresponde a posição de memória física X.
 \end{itemize}
 
 Em um mapeamento 1 para 1, para popular as TTBs, primeiramente, em um loop, itera-se 512 vezes (já que há 512 de RAM), salvando em posições sucessivas de uma determinada região da memória os endereços das TTB2s, levando-se em conta as \emph{flags} acima mencionadas, após as 512 posições, itera-se pelas 3584 posições restantes (4 GB - 512 MB) marcando aquelas regiões como não mapeadas. Feito isto, é necessário também popular cada TTB2 que foi apontada na TTB1, em um processo semelhante. Em um mapeamento por demanda, marca-se as regiões da memória virtual como não mapeadas, com a diferença que, ao invés de apenas abortar o acesso, cria-se dinamicamente aquele mapeamento.
 
-Após feita as tabelas, a MMU está pronta para ser ativada. A MMU é controlada pelo coprocessador CP15, é nele que são guardados os registradores de configuração, endereço base para a TTP, dentre outras funções. Escrevendo-se 1 no bit menos significativo no registrador c1 (SCTLR) deste coprocessador a MMU é ativada.
+Após feita as tabelas, a MMU está pronta para ser ativada. A MMU é controlada pelo coprocessador CP15, é nele que são guardados os registradores de configuração, endereço base para a TTP, dentre outras funções. Escrevendo-se 1 no bit menos significativo no registrador c1 (SCTLR) deste coprocessador, a MMU é ativada.
 
 %memory map?
 
 \section{Multicore}
 
-Ao se ligar a placa, apenas a CPU0 executa código, e é função dela fazer as inicializações necessárias para então ligar o segundo processador (CPU1). Inicialmente, o CPU1 executa uma instrução (\verb+wfe+) que o coloca em modo de espera por evento (\emph{Wait for Event Mode}). Para sair deste modo, a CPU0 precisa emitir uma instrução do tipo evento de sistema, \verb+sev+ (\emph{System Event}). Quando a CPU1 recebe este sinal, ele imediatamente executa a instrução que está no endereço 0xfffffff0, localização onde a CPU0 deve previamente ter escrito uma instrução que faça a CPU1 fazer um \verb+jump+ para o ponto de entrada do que se deseja executar com a CPU1. Note que a posição 0xfffffff0 é uma região reservada da memória, e não corresponde à uma posição da RAM (é o mesmo princípio de registradores mapeados em memória).
+Ao se ligar a placa, apenas a CPU0 executa código, e é função dela fazer as inicializações necessárias para então ligar o segundo processador (CPU1). Inicialmente, a CPU1 executa uma instrução (\verb+wfe+) que o coloca em modo de espera por evento (\emph{Wait for Event Mode}). Para sair deste modo, a CPU0 precisa emitir uma instrução do tipo evento de sistema, \verb+sev+ (\emph{System Event}). Quando a CPU1 recebe este sinal, ele imediatamente executa a instrução que está no endereço 0xfffffff0, localização onde a CPU0 deve previamente ter escrito uma instrução que faça a CPU1 fazer um \verb+jump+ para o ponto de entrada do que se deseja executar com a CPU1. Note que a posição 0xfffffff0 é uma região reservada da memória, e não corresponde à uma posição da RAM (é o mesmo princípio de registradores mapeados em memória).
 
 Isto é suficiente para fazer o segundo processador passar a executar código, entretanto esta é a parte simples, ter dois processadores rodando tem várias implicações sobre como deve ser o \emph{design} de cada componente do sistema, pois agora há a preocupação com coerência e consistência de memória, condições de corrida {\emph{racing conditions}) e etc.
 
-	Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, assim como seu\emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como mostrado na seção anterior.
+	Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, assim como seu\emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como citado na seção anterior.
 
 
 \chapter{Conclusão}
 
-Este trabalho visou descrever como foi feito o porte do sistema operacional EPOS para a Zedboard. Foram explicadas as decisões de projeto feitas, de modo que as próximas pessoas que venham a portar o EPOS para outra arquitetura, possam entender o raciocínio por trás do que foi implementado, de modo que o que foi aqui exposto possa ser adaptado para outros contextos.
+Este trabalho visou descrever como foi feito o porte do sistema operacional EPOS para a Zedboard. Foram explicadas as decisões de projeto feitas, de modo que as próximas pessoas que venham a portar o EPOS para outra arquitetura, possam entender o raciocínio por trás do que foi implementado, para que o que foi aqui exposto possa ser adaptado a outros contextos.
 
 Foi necessário explicar uma série de especificidades da arquitetura para expor como que é feito o interfaceamento do software com o hardware, e como um sistema operacional pode controlar e configurar componentes de hardware.
 
-Este porte possibilitou novos cenários de aplicação do EPOS, espera-se portanto que isto contribua para estimular novas linhas de pesquisa com este sistema operacional.
+Este porte possibilitou novos cenários de aplicação do EPOS, espera-se portanto que isto contribua para estimular novas linhas de pesquisa com este sistema operacional na arquitetura trabalhada.
