@@ -11,11 +11,33 @@
 
 \usepackage{amsmath}
 \usepackage{multirow}
+
 \usepackage{url}
+%\usepackage{hyperref}
+%\hypersetup{
+%    colorlinks,
+%    citecolor=black,
+%    filecolor=black,
+%    linkcolor=black,
+%    urlcolor=black
+%}
+
 %\usepackage{hyperref}
 %----------------------------------------------------------------------
 % Comandos criados pelo usuário
 \newcommand{\afazer}[1]{{\color{red}{#1}}} % Para destacar uma parte a ser trabalhada
+
+\newcommand{\fig}[4][hbt]{
+	\begin{figure}[#1]{
+		\centering
+		\scalebox{#2}{
+			\includegraphics{figuras/#3}
+		}\par
+	}
+    \caption{#4}
+    \label{fig:#3}
+	\end{figure}
+}
 
 %----------------------------------------------------------------------
 % Identificadores do trabalho
@@ -32,7 +54,7 @@
 \data{22}{Fevereiro}{2014}
 
 \orientador[Orientador\\Universidade Federal de Santa Catarina]{Prof. Dr. Antônio Augusto Fröhlich}
-\coorientador[Coorientador\\Universidade Federal de Santa Catarina]{Prof. M.Sc. Giovani Gracioli}
+\coorientador[Coorientador\\Universidade Federal de Santa Catarina]{Prof. Dr. Giovani Gracioli}
 \coordenador[Coordenador\\Universidade Federal de Santa Catarina]{Prof. Dr. Vitório Bruno Mazzola}
 
 \numerodemembrosnabanca{4} % Isso decide se haverá uma folha adicional
@@ -135,8 +157,10 @@ Finalmente, um beijo no coração para todos aqueles que desejam falir a Microso
 
 \input{intro}
 \input{conceitos}
+\input{arquitetura}
+\input{epos}
 \input{porte}
-
+\input{conclusao}
 
 
 

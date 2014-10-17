@@ -1,11 +1,17 @@
-\chapter{Porte}
+\chapter{Implementação dos Mediadores de Hardware}
 
 % Eu poderia descrever como eu tenho que incluir cada classe feita em ./include/system/types.h, opções de traits, etc..
 
 
-Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões tomadas. Antes de entrar nas especificidades de cada componente, é interessante colocar aqui alguns conceitos comuns que são usados em cada mediador.
+%TODO load/save context -> are they updating TTBR0?
+
+Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões tomadas.
 
 A grosso modo, o processo de inicialização da CPU envolve \cite[p.~110]{ug585.1.7}:
+
+%
+% Fazer imagem BONITA sobre a table abaixo
+%
 \begin{enumerate}
 	\item Definir a tabela de vetores.
 	\item Invalidar \emph{caches}, TLB, \emph{branch predictor}
@@ -19,60 +25,10 @@ A grosso modo, o processo de inicialização da CPU envolve \cite[p.~110]{ug585.
 
 Estes e outros passos (como inicialização do GIC) são explicados em detalhe nas seções que seguem.
 
-\section{Registradores Mapeados em Memória}
-A maneira usada para se comunicar, configurar e ler o estado de um dado componente de hardware é através da leitura e/ou escrita em registradores mapeados em memória. Um registrador mapeado em memória basicamente é uma região fixa da memória, onde uma escrita naquela posição indica uma escrita no registrador lá mapeado.
-Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, responsável por indicar quantos ciclos\footnote{Na realidade é o número de baud\_samples que se passaram.} a UART deve esperar um novo caractere chegar antes de emitir uma interrupção de \emph{timeout}. Este registrador está mapeado na posição de memória 0xE000001C para a UART0. Portanto, para configurar que o número de ciclos esperado seja de 20, basta escrever este número naquela posição. Uma maneira de fazer esta escrita, por exemplo, em C/C++, é: \verb+*((unsigned long*)0xE000001C) = 20;+.
 
-%\section{Boot}
 
-\section{Traits}
 
-Existem 4 arquivos traits.h que devem ser levados em consideração em um porte, dois deles devem ser completamente reescritos. Os arquivos \verb+./include/traits.h+ e \verb+/include/system/traits.h+ (onde `.' é a pasta raiz do código) possuem configurações gerais do EPOS, que, a princípio, devem ser independentes de arquitetura. Na prática há alguns pequenos ajustes que devem ser feitos nesses arquivos, pois é lá que se define, por exemplo, se o EPOS trabalhará em um processador \emph{multicore}, se utilizará \emph{scratchpad}, quais componentes estarão em modo de depuração e etc; entretanto isto se resume a trocar o valor de algumas variáveis de \emph{true} para \emph{false} e vice-versa.
-
-Os outros dois arquivos são \verb+./include/mach/zynq/traits.h+ e\\ \verb+./include/arch/armv7/traits.h+. Essa divisão é necessária pois, como dito anteriormente, é possível de um mesmo processador estar em diferentes \emph{machines}, e, caso seja necessário fazer um porte para aquela plataforma, bastaria modificar os arquivos da pasta \emph{mach}, deixando os da pasta \emph{arch} praticamente intactos, o que facilita muito novos portes.
-
-O arquivo \verb+./include/arch/armv7/traits.h+ trata das opções específicas do processador, portanto é lá que opções como \emph{endianess}, velocidade de \emph{clock}, número de \emph{cores}, tamanho da \emph{heap} e \emph{stacks}, bem como outras opções pertinentes ao mapeamento de memória e opções da MMU podem ser configuradas.
-
-No arquivo de traits da \emph{machine}, ficam as opções de configuração de componentes como a UART, controlador de interrupções, \emph{timer}, e qualquer componente de interfaceamento externo à placa (rede, por exemplo). Componentes podem ser facilmente ativados ou desativados nestas opções.
-
-\section{Metaprogramação estática}
-
-A arquitetura do EPOS usa pesadamente de metaprogramação estática para, em tempo de compilação, selecionar a arquitetura, bem como cada componente que será ou não utilizado. Por exemplo, podemos definir um \verb+if+ estático para selecionar de qual classe a classe Chronometer irá derivar. Primeiramente a definição do \verb+if+:
-
-\begin{verbatim}
-template<bool condition, typename Then, typename Else> struct IF
-{
-    typedef Then Result;
-};
-\end{verbatim}
-
-Este template, a princípio, nada mais faz do que tomar 3 parâmetros e então criar um tipo chamado \verb+Result+ igual ao segundo parâmetro, contudo, se fizermos uma especialização deste template, ele passa ser útil:
-
-\hspace*{-1.5cm}\vbox{
-\begin{verbatim}
-template<typename Then, typename Else> struct IF<false, Then, Else>
-{
-    typedef Else Result;
-};
-\end{verbatim}
-}
-
-Com esta especialização, toda vez que o primeiro parâmetro resolver-se como falso, \verb+Result+ será definido como o terceiro parâmetro. Temos, portanto, um \verb+if+ metaprogramado funcional, agora voltemos ao exemplo do chronometro.
-
-Suponha que caso a arquitetura não seja multicore, e nos traits o TSC (\emph{time stamp clock}) esteja ativo, então deseja-se que Chronometer derive de TSC\_Chronometer, do contrário de Alarm\_Chronometer.
-
-Isto pode ser feito usando nosso \verb+if+ metaprogramado da seguinte forma:
-
-\begin{verbatim}
-class Chronometer: public
-IF<Traits<TSC>::enabled && !Traits<System>::multicore,
-TSC_Chronometer, Alarm_Chronometer>::Result
-{/*class body*/};
-\end{verbatim}
-
-Deste modo, Chronomometer derivará de \verb+IF::Result+, que será resolvido como TSC\_Chronometer ou Alarm\_Chronometer. Note que esse exemplo também mostra um uso do Traits, onde para descobrir se o TSC está ativo, bastou ler a constante \verb+Traits<TSC>::enabled+, e, para saber se o sistema é multicore, bastou ler \verb+Traits<System>::multicore+. Todo esse processamento causa zero \emph{overhead} em tempo de execução.
-
-\section{Porte da UART}
+\section{Mediador da UART}
 
 A inicialização da UART foi feita de acordo com o sugerido pelo manual em \cite[p.~554]{ug585}. Nesta seção será comentado as decisões tomadas na configuração inicial da UART, em particular por causa dos momentos em que o manual exigia que o desenvolvedor tomasse uma decisão.
 
@@ -101,13 +57,13 @@ O valor padrão de BDIV é 15, portanto, fixando-se este valor e resolvendo a eq
 
 Após estas configurações, dentre outras que o manual descreve, a UART está pronta para ser usada. Os dois principais métodos usados da UART são o \verb+put+ e o \verb+get+, o primeiro escreve um caractere na saída serial, sendo que este pode ser lido, por exemplo através de uma entrada USB, para imprimir estes caracteres numa tela; algo muito útil para depuração.
 
-\section{Porte do \emph{Timer}}
+\section{Mediador do \emph{Timer}}
 
 
 
 Um \emph{timer} permite contar um certo número de ciclos, e, ao final da contagem, ele emite uma interrupção ao GIC, para que então o processador trate este evento. Entretanto note que é possível de existir mais \emph{timers} sendo usados logicamente do que \emph{timers} físicos disponíveis, significando que um mesmo \emph{timer} deve conseguir servir a mais de uma requisição simultaneamente.
 
-Portanto não podemos apenas configurar um \emph{timer} para contar initerruptamente até passar o tempo que desejamos, do contrário novas requisições sobreescreveriam a anterior. Para ilustrar, suponha que se queira contar por 10 segundos, como o \emph{clock} do \emph{timer} é de 333 MHz (periodo $\frac{1}{333 \times 10^6}$s), bastaria configurar o \emph{timer} para contar por $10 \times 333 \times 10^6$ ciclos e então chamar o \emph{handler} associado a interrupção gerada quando o \emph{timer} chegar em zero.
+Portanto não podemos apenas configurar um \emph{timer} para contar initerruptamente até passar o tempo que desejamos, do contrário novas requisições sobreescreveriam a anterior. Para ilustrar, suponha que se queira contar por 10 segundos, como o \emph{clock} do \emph{timer} é de 333 MHz (periodo $\frac{1}{333 \times 10^6}$s), bastaria configurar o \emph{timer} para contar por $10 \times 333 \times 10^6$ ciclos e então chamar o \emph{handler} associado à interrupção gerada quando o \emph{timer} chegar em zero.
 
 Agora imagine que, no cenário acima, enquanto o \emph{timer} ainda está servido àquela solicitação de contagem, apareça outra solicitação, de um alarme por exemplo, e queria contar por 20 segundos. Se esta solicitação sobrescrever o registrador de configuração do \emph{timer}, a solicitação anterior não terá seu pedido atendido a tempo. Note também que o escalonador de processos também estará usando este \emph{timer}.
 
@@ -146,7 +102,7 @@ void Zynq_Timer::int_handler(IC::Interrupt_Id id)
 }
 \end{verbatim}
 
-No código, \verb+_current + guarda o número de ticks atual daquele \emph{timer} (para cada processador), e \verb+_initial+ guarda o número inicial de ticks que foi configurado na inicialização do do escalonador. Note então que a cada interrupção de \emph{timer}, o tratador do alarme será chamado (no caso do primeiro processador), já o do escalonador, somente a cada certo número de ticks ele será chamado (cerca de 100 na implementação).
+No código, \verb+_current+ guarda o número de ticks atual daquele \emph{timer} (para cada processador), e \verb+_initial+ guarda o número inicial de ticks que foi configurado na inicialização do do escalonador. Note então que a cada interrupção de \emph{timer}, o tratador do alarme será chamado (no caso do primeiro processador), já o do escalonador, somente a cada certo número de ticks ele será chamado (cerca de 100 na implementação).
 
 Os 4 principais registradores a se trabalhar para configurar o \emph{timer} são o \verb+load+, registrador onde se escreve por quantos ciclos se deve contar; o \verb+counter+, que é o registrador que contém o atual valor contado, sendo decrementado a cada ciclo até chegar em zero, chegando em zero o é gerada uma interrupção número 29; registrador \verb+control+, que permite configurar certos comportamentos do \emph{timer}, como o de ativa-lo, ativar modo cíclico, ativar interrupções e atribuir um valor para o \verb+prescale+; e finalmente o registrador \verb+interrupt status+, que, como o nome indica, permite que se leia o status das interrupções de timer. Todos os timers trabalham à metade do \emph{clock} do sistema, ou seja, usando o \emph{clock} CPU\_3x2x.
 
@@ -271,7 +227,7 @@ O processador, ao receber uma interrupção, (portanto as interrupções estão 
 
 O principal tratador é o tratador de interrupções IRQ (\verb+irc_handler+), sendo que este precisa ser discutido com mais profundidade. Abaixo segue o código deste tratador:
 
-\hspace*{-1cm}\vbox{
+\hspace*{-1.5cm}\vbox{
 \begin{verbatim}
 43 void _irq_handler() {
 44   ASMV(
@@ -281,26 +237,26 @@ O principal tratador é o tratador de interrupções IRQ (\verb+irc_handler+), s
 48   ".equ ARM_MODE_SVC,      0x13 \n"
 49   ".equ IRQ_BIT,           0x80 \n"
 50   ".equ FIQ_BIT,           0x40 \n"
-51 
-52   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT \n" // go to SVC
-53   // save current context (lr, sp and spsr are banked registers)
+51   // go to SVC
+52   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT \n"
+53   //save current context (lr, sp and spsr are banked registers)
 54   "stmfd sp!, {r0-r3,r12,lr,pc}\n"
 55 
-56   "msr cpsr_c, #ARM_MODE_IRQ | IRQ_BIT | FIQ_BIT\n" //go to IRQ
+56   "msr cpsr_c, #ARM_MODE_IRQ | IRQ_BIT | FIQ_BIT\n"//go to IRQ
 57 
 58   "sub r0, lr, #4 \n" // return from irq addr
 59   "mrs r1, spsr   \n" // pass irq_spsr to svc r1
-60 
-61   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT\n"//go back to SVC
-62   "add r2, sp, #24 \n"  // sp+24 is the position of the saved pc
+60   //go back to SVC
+61   "msr cpsr_c, #ARM_MODE_SVC | IRQ_BIT | FIQ_BIT\n"
+62   "add r2, sp, #24 \n" //sp+24 is the position of the saved pc
 63   
 64   // save return address into the pc position
 65   "str r0, [r2] \n" 
 66   "stmfd sp!, {r1} \n"   // save irq-spsr
 67       
-68   );    
-69   
-70     
+68   );
+\end{verbatim}
+\begin{verbatim}
 71   IC::int_handler();
 72     
 73   ASMV(        
@@ -351,7 +307,7 @@ Normalmente, interrupções de \emph{timer} são o tipo mais frequente de interr
 
 
 \section{MMU}
-
+\label{sec:mmu}
 %nice image in p.87 ug585
 
 %na inicialização, é liberada toda a memória, colocando ela numa lista
@@ -419,27 +375,26 @@ Agora vamos discutir o que cada campo de uma entrada da TTP2 significa.
 
 \textbf{AP e APx:} São os bits que codificam o tipo de acesso que aquela porção de memória possui. Estes bits só são checados caso do domínio seja de \emph{Cliente}. Um acesso que não possui as permissões necessárias geram uma exceção do tipo \emph{prefetch} ou \emph{data abort}. APx e AP[2] são sinônimos. A tabela \ref{tab:apx} ilustra os diferentes tipos de acesso que podem ser codificados.
 
-%\hspace*{-1cm}\vbox{
 \begin{table}[h]
-	%\centering
-	\hskip-2.2cm\begin{tabular}{cccccc}
+	\centering
+	\begin{tabular}{ccccc}
 		\hline \hline
-		APx & AP[1] & AP[0] & Privilegiado & Não Privilegiado & Descrição\\[0.5ex]
+		APx & AP[1] & AP[0] & Privilegiado & Não Privilegiado\\[0.5ex]
 		\hline
-		0 & 0 & 0 & Sem acesso & Sem acesso & Gera uma falta de permissão\\
-		0 & 0 & 1 & Escrita/Leitura & Sem acesso & Acesso somente modo privilegiado\\
-		0 & 1 & 0 & Escrita/Leitura & Sem acesso & Acesso somente modo privilegiado\\
-		0 & 1 & 1 & Escrita/Leitura & Sem acesso & Acesso somente modo privilegiado\\
-		1 & 0 & 0 & \~{} 			& \~{}		 & Combinação reservada\\
-		1 & 0 & 1 & Leitura 		& Sem acesso & Leitura somente modo privilegiado\\
-		1 & 1 & 0 & Leitura 		& Leitura	 & Somente leitura\\
-		1 & 1 & 1 & \~{} 			& \~{}		 & Combinação reservada\\[1ex]
+		0 & 0 & 0 & Sem acesso & Sem acesso\\
+		0 & 0 & 1 & Escrita/Leitura & Sem acesso\\
+		0 & 1 & 0 & Escrita/Leitura & Sem acesso\\
+		0 & 1 & 1 & Escrita/Leitura & Sem acesso\\
+		1 & 0 & 0 & \~{} 			& \~{}		 \\
+		1 & 0 & 1 & Leitura 		& Sem acesso \\
+		1 & 1 & 0 & Leitura 		& Leitura	 \\
+		1 & 1 & 1 & \~{} 			& \~{}		 \\[1ex]
 		\hline
 	\end{tabular}
 	\caption{Codificações das permissões de acesso.}
 	\label{tab:apx}
 \end{table}
-%}
+
 
 \textbf{TEX:} Controla políticas de compartilhamento de memória, caso aquela região seja compartilhada.
 \textbf{C e B:} Estes campos combinados controlam a política de ``cacheamento'' daquela região de memória, ou seja, se ela pode ser salva na cache, e se pode, qual o algoritmo a a ser usado, como \emph{write-back} ou \emph{write-though}, e também políticas de \emph{write-allocate}.
@@ -448,7 +403,7 @@ Agora vamos discutir o que cada campo de uma entrada da TTP2 significa.
 \textbf{xN:} Bit que marca a região como não executável. É importante por questões de segurança, já que o \emph{fetch} especulativo de instruções pode ler uma porção de memória que possui dados sensíveis.
 
 
-\subsection{Populando a Tabela}
+\subsection{Inicializando a Tabela de Páginas}
 
 Agora que sabemos como as TTPs são estruturadas, bem como o formato de cada entrada dela, podemos finalmente popular esta tabela. Há várias estratégias para fazer isto \cite{mmutheory}, dependendo da forma desejada de mapeamento, por exemplo:
 
@@ -462,7 +417,10 @@ Em um mapeamento 1 para 1, para popular as TTBs, primeiramente, em um loop, iter
 
 Após feita as tabelas, a MMU está pronta para ser ativada. A MMU é controlada pelo coprocessador CP15, é nele que são guardados os registradores de configuração, endereço base para a TTP, dentre outras funções. Escrevendo-se 1 no bit menos significativo no registrador c1 (SCTLR) deste coprocessador, a MMU é ativada.
 
-%memory map?
+
+\section{Mediador da CPU}
+
+\section{Mediador SCU}
 
 \section{Multicore}
 
@@ -473,10 +431,4 @@ Isto é suficiente para fazer o segundo processador passar a executar código, e
 	Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, assim como seu\emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como citado na seção anterior.
 
 
-\chapter{Conclusão}
 
-Este trabalho visou descrever como foi feito o porte do sistema operacional EPOS para a Zedboard. Foram explicadas as decisões de projeto feitas, de modo que as próximas pessoas que venham a portar o EPOS para outra arquitetura, possam entender o raciocínio por trás do que foi implementado, para que o que foi aqui exposto possa ser adaptado a outros contextos.
-
-Foi necessário explicar uma série de especificidades da arquitetura para expor como que é feito o interfaceamento do software com o hardware, e como um sistema operacional pode controlar e configurar componentes de hardware.
-
-Este porte possibilitou novos cenários de aplicação do EPOS, espera-se portanto que isto contribua para estimular novas linhas de pesquisa com este sistema operacional na arquitetura trabalhada.

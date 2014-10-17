@@ -1,241 +1,134 @@
 \chapter{Conceitos Básicos}
 
-%source: http://epos.lisha.ufsc.br/EPOS+User+Guide
-\section{EPOS}
+Esta seção tem por objetivo o estabelecimento dos conceitos básicos necessários ao entendimento do restante do trabalho. Não pretende-se aqui fazer uma explicação extensiva e profunda sobre os conceitos aqui expostos, mas sim uma breve introdução, deixando os detalhes para serem procurados pelo leitor interessado nas referências aqui colocadas.
 
-EPOS (Embedded Parallel Operating System) é um sistema operacional orientado a aplicação, cujo design chama-se ADESD (\emph{Application-Driven Embedded System Design Method}), proposto por Fröhlich \cite{guto_thesis}. A ideia central do EPOS é prover um sistema operacional mínimo, de modo a minimizar o \emph{overhead} da existência de um sistema operacional, deixando o processador livre para executar a aplicação do desenvolvedor \cite{epos_user_guide}.
+%Listar os nomes mais usados aqui, como MMU, timer, etc, e escrever um parágrafo simples falando o que conceitualmente estes componentes são, sem chegar nas específicidades do hardware, nem tocar nos conceitos do EPOS.
 
-Como o objetivo é criar um ambiente em que o desenvolvedor possa rapidamente produzir suas aplicações, EPOS provê vários utilitários comumente usados em aplicações, como filas, listas, tabelas de hashs, vetores, semáforos, OStream (para imprimir na tela), números aleatórios, cálculo de CRC e etc. Além destes utilitários, EPOS também provê uma série de componentes como threads, alarmes, cronometros, \emph{heaps} e meios para acessar a rede (internet).
+\section{Metaprogramação estática}
+Metaprograma é um program que representa e manipula outros programas ou eles próprios \cite{generative}.
+Com metaprogramação é possível fazer-se loops (através de recursão), e condicionais (como o \verb+IF+ discutido abaixo), fazendo com que metaprogramas tenham equivalência com uma máquina de turing \cite{generative}. De fato, a linguagem de metaprogramação de C++ pode ser vista como uma linguagem funcional que tem sua execução em tempo de compilação. Pode-se fazer muitas estruturas metaprogramadas, inclusive listas, árvores e etc, entretanto nesta seção será mostrado apenas o funcionamento básico de um \verb+IF+ metaprogramado, pois este é bastante usado no código do EPOS. Para um maior entendimento sobre o assunto, fica aqui recomendado o livro referenciado.
 
-\section{Arquitetura do EPOS}
+A arquitetura do EPOS usa pesadamente de metaprogramação estática para, em tempo de compilação, selecionar a arquitetura, bem como cada componente que será ou não utilizado. Por exemplo, podemos definir um \verb+if+ estático para selecionar de qual classe a classe Chronometer irá derivar. Primeiramente a definição do \verb+if+:
 
-\textbf{Mediadores de Hardware:} Dentro da arquitetura do EPOS há o conceito de mediadores de hardware, que são os componentes (ou classes) dependentes de plataforma. Idealmente, as únicas classes que precisam ser modificadas e/ou reimplementadas são os mediadores. Há mediadores específicos da placa, como por exemplo Pandaboard, Zedboard e etc; abstraídos sob o nome de \emph{machine} e mediadores específicos de um processador, abstraídos sob o nome de \emph{architecture}. No código do EPOS, estes mediadores encontram-se nas pastas \emph{mach} e \emph{arch}.
-% Fonte: Hardware Mediators: A Portability Artifact for Component-based Systems
-% HAL vs Virtualização vs Mediadores
+\begin{verbatim}
+template<bool condition, typename Then, typename Else> struct IF
+{
+    typedef Then Result;
+};
+\end{verbatim}
 
-Mediadores de hardware são uma alternativa ao tradicional uso de VMs\footnote{Virtual Machines.} e de HAL\footnote{Hardware Abstraction Layer}, proposta por Fröhlich em seu trabalho \emph{Application-Oriented System Design} \cite{guto_thesis}. O problema do uso de VMs é o seu \emph{overhead} causado devido à tradução das operações da VM em código nativo. Já o uso de um HAL incorre no problema da manutenibilidade e dificuldade de adapção à novas arquiteturas muito distintas entre si \cite{hw_mediators}. O HAL não conseguiu passar pela ``prova do tempo'', e já está sendo considerado obsoleto por distribuições GNU/Linux populares, como o 
-Ubuntu\footnote{\url{http://www.linux-magazine.com/Online/News/Ubuntu-10.04-Alpha-2-Removes-HAL}}, sendo chamado de ``uma grande não-manutenível bagunça monolítica''\footnote{\url{https://wiki.ubuntu.com/Halsectomy}}.
+Este template, a princípio, nada mais faz do que tomar 3 parâmetros e então criar um tipo chamado \verb+Result+ igual ao segundo parâmetro, contudo, se fizermos uma especialização deste template, ele passa ser útil:
 
+\hspace*{-1.5cm}\vbox{
+\begin{verbatim}
+template<typename Then, typename Else> struct IF<false, Then, Else>
+{
+    typedef Else Result;
+};
+\end{verbatim}
+}
 
+Com esta especialização, toda vez que o primeiro parâmetro resolver-se como falso, \verb+Result+ será definido como o terceiro parâmetro. Temos, portanto, um \verb+if+ metaprogramado funcional, agora voltemos ao exemplo do chronometro.
 
-\textbf{Traits:} Traits são classes onde é possível configurar certos componentes do EPOS em tempo de compilação. Lá é possível, por exemplo, definir o tamanho da \emph{stack} e \emph{heap} do sistema, a sua frequência de \emph{clock} bem como ativar ou desativar certas funções do sistema. Esta classe normalmente precisa ser alterada em um porte, mesmo ela não sendo um mediador de hardware, pois eles usam as configurações descritas nos traits.
+Suponha que caso a arquitetura não seja multicore, e nos traits o TSC (\emph{time stamp clock}) esteja ativo, então deseja-se que Chronometer derive de TSC\_Chronometer, do contrário de Alarm\_Chronometer.
 
-\textbf{Interface Infladas: } Um conceito importante da arquitetura do EPOS é a Interface Inflada. %http://www.inf.ufsc.br/~guto/publications/aoos.pdf
-Em sistemas orientados a aplicação, famílias de abstrações são frequentemente tratadas como entidades únicas, algo que pode ser vantajoso para o programador da aplicação, já que este não precisaria se preocupar com qual membro em específico desta família ele precisaria usar \cite{guto_thesis}.
+Isto pode ser feito usando nosso \verb+if+ metaprogramado da seguinte forma:
 
-Interface inflada basicamente é uma interface que declara os métodos de todas as classes que derivam dela, exportanto assim todos os métodos daquela família de abstrações, como mostra a figura \ref{fig:inflated}. Deste modo, o desenvolvedor de aplicativo poderia escrever a aplicação inteira em termos da interface inflada, relegando a tarefa de configuração do sistema a um utilitário automatizado. Tal utilitário poderia, através de uma análise sintática do código fonte, escolher quais os membros mais apropriados da família exportada serão associados no momento da compilação \cite[p.~56]{guto_thesis}.
+\begin{verbatim}
+class Chronometer: public
+IF<Traits<TSC>::enabled && !Traits<System>::multicore,
+TSC_Chronometer, Alarm_Chronometer>::Result
+{/*class body*/};
+\end{verbatim}
 
-%write about specifics from timers
-\begin{figure}[ht!]
-	\label{fig:inflated}
-    \centering
-    \includegraphics[width=7.5cm]{figuras/inflated_interface}
-    \caption{Exemplos de uso de interfaces infladas \cite{guto_thesis}.}
-\end{figure}
+Deste modo, Chronomometer derivará de \verb+IF::Result+, que será resolvido como TSC\_Chronometer ou Alarm\_Chronometer. Note que esse exemplo também mostra um uso do Traits, onde para descobrir se o TSC está ativo, bastou ler a constante \verb+Traits<TSC>::enabled+, e, para saber se o sistema é multicore, bastou ler \verb+Traits<System>::multicore+. Todo esse processamento causa zero \emph{overhead} em tempo de execução.
 
+\section{Registradores Mapeados em Memória}
+A maneira usada para se comunicar, configurar e ler o estado de um dado componente de hardware é através da leitura e/ou escrita em registradores mapeados em memória. Um registrador mapeado em memória basicamente é uma região fixa da memória, onde uma escrita naquela posição indica uma escrita no registrador lá mapeado.
+Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, responsável por indicar quantos ciclos\footnote{Na realidade é o número de baud\_samples que se passaram.} a UART deve esperar um novo caractere chegar antes de emitir uma interrupção de \emph{timeout}. Este registrador está mapeado na posição de memória 0xE000001C para a UART0. Portanto, para configurar que o número de ciclos esperado seja de 20, basta escrever este número naquela posição. Uma maneira de fazer esta escrita, por exemplo, em C/C++, é: \verb+*((unsigned long*)0xE000001C) = 20;+.
 
-\section{Hardware-alvo}
-%source: http://www.zedboard.org/product/zedboard
-% http://www.zedboard.org/sites/default/files/documentations/ZedBoard_HW_UG_v2_2.pdf
-Zedboard é uma plataforma de desenvolvimento que suporta uma grande variedade de aplicações, visto que ela possui uma boa gama de interfaces e funções para habilitar isto. É dedicada à prototipação e \emph{proof-of-concept}. Em seu interior ela possui um Xilinx Zynq 7000 (Z-7020), que é a arquitetura alvo deste porte. A figura \ref{fig:zed} mostra como é a placa fisicamente.
+\section{Orientação a Objetos}
+Programação orientada a objetos é um método de implementação no qual programas são organizados como coleções cooperantes de objetos, cada qual representa uma instância de alguma classe, sendo que estas classes são todas membros de uma hierarquia de classes unidas por relações de herança \cite{OOAD}.
 
-O ZYNQ-7000 SOC XC7Z020-CLG484-1 conta com o processador Dual ARM Cortex-A9 MPCore. O Zynq possui 4 graduações de velocidade de \emph{clock}, a comercial (graduação -1), industrial (graduação -1 a -2), estendida (-2 a -3) e expandida (-1), sendo a graduação -1 a menor velocidade, e a -3 a maior \cite{product_table}.
 
-De acordo com a especificação da Zedboard \cite{zedboard}, o \emph{clock} máximo do processador é de 667MHZ, portanto, tendo como referência a tabela de dados do Zynq-7000 \cite[p.~13]{data_sheet}, chegamos à conclusão que a graduação de velocidade do Zynq usado na Zedboard é de -1 (comercial), esta informação se tornará útil mais à frente.
+\section{Sistema Operacional}
+Tanenbaum define sistemas operacionais sob duas perspectivas \cite{tanenbaum}:
 
-Há disponível 512MB de RAM DDR3, e um SD card de 4GB. A Zedboard suporta conexão com JTAG, saída serial (USB UART) e conexão com a internet \cite{xilinx}.
+\textbf{SO como uma máquina extendida:}
+Programar ao nível de linguagem de máquina pode ser um tanto desastroso e desnecessariamente complicado. Por exemplo, na arquitetura PD765, o controlador de um disquete possui 16 comandos de controle, sendo os mais básico os comandos WRITE e READ. Cada um destes comandos requerem 13 parâmetros, codificados em 9 bytes, parâmetros estes que específicam o endereço do bloco a ser lido, número de setores por trilha, modo de gravação desejada, etc.
 
-A família Zynq 7000 disponibiliza para o desenvolvedor FPGAs, tornando esta plataforma mais configurável e flexível \cite[p.~26]{ug585}. A PS dessa família é a mesma para cada dispositivo onde ela se encontra, entretanto a PL e recursos de entrada e saída variam entre diferentes dispositivos. 
+Certamente um programador não ter ter que lidar com esse tipo de detalhe, e no lugar ele gostaria apenas de ter uma simples abstração de arquivos que podem ser abertos, editados, salvos e fechados.
+O programa que procura esconder estes detalhes sórdidos é o sistema operacional, que procura abstrair o gerenciamento de arquivos, assim como detalhes sobre tratamento de interrupções, timers, gerenciamento de memória e qualquer outro detalhe de baixo nível, fazendo assim o programador ter a ilusão de estar interagindo com uma máquina mais simples e de mais alto nível.
 
+\textbf{SO como um gerenciador de recursos:}
+Diferentes processos competem entre si por utilizar os recursos do sistema. Estes processos precisam compartilhar entre si memória, tempo na CPU, dispositivos de entrada e saída, impressoras, etc. O programa responsável por conciliar as necessidades de cada processo, gerenciando os recursos da máquina de forma organizada e que atenda à todas as requisições por eles é, também, o sistema operacional.
 
-\begin{figure}[ht!]
-	\label{fig:zed}
-    \centering
-    \includegraphics[width=8cm]{figuras/zedboard}
-    \caption{Zedboard visto de cima.}
-\end{figure}
+\section{Processo}
+Um processo basicamente é um programa \emph{em execução}, incluindo o seu \emph{program counter}, registradores e variáveis \cite{tanenbaum}. Cada processo possui um espaço de endereçamento próprio e individual, entando protegidos (e impedidos) de acessarem a porção de memória alocada para os demais processos. Cada processo executa na CPU por um certo intervalo de tempo, e então, caso não tenha terminado sua execução, esta é interrompida pelo escalonador de processos (veja seção \ref{escalonador} para que a CPU possa ser usada por outro processo.
 
-\subsection{Arquitetura do Zynq 7000}
-Como já citado, o Zynq 7000 possui um processador \emph{dual core} Cortex A9, cada core possui sua própria MMU e memória cache L1 (instruções e dados) privada.
+\section{Thread}
+Todo processo está rodando pelo menos uma thread, e um conjunto de threads pode pertencer ao mesmo processo (toda thread pertence à algum processo). Cada thread pode executar independentemente, de forma pseudoparalela
+\footnote{Em uma arquitetura de processador com apenas um núcleo, todos os processos e threads executam na realidade sequencialmente, entretanto parecem ser executadas paralelamente devido à pequena fatia de tempo que cada processo/thread possui para executar, por isto chamamos isto de pseudoparalelismo. Mesmo em arquiteturas de multiplos núcleos o paralelismo ``verdadeiro'' ainda não acontece com frequência, já que basta existirem mais processos/threads do que o número de núcleos para que estes tenham que ser sequenciados.}
+, entretanto cada thread compartilha do espaço de endereçamento do processo ao qual pertencem. Cada thread possui seu próprio contexto, isto é, o estado de seus registradores (incluindo o \emph{program counter}, pilha e etc.
+A vantagem de threads sobre processos é que a comunicação entre threads de um mesmo processo é muito mais rápida que a comunicação intraprocessos, e criar uma thread é mais rápido que criar um processo também.
 
-%layout de memoria
-\subsection{OCM} O \emph{On-chip Memory} é uma pequena memória de 256KB de RAM que fica próxima ao processador, e portanto tem um acesso mais rápido. O OCM pode ser mapeado nos primeiros 256KB do espaço de endereçamento, ou nos últimos 256KB do espaço de endereçamento \cite{ug585}.
+\section{Escalonador}
+\label{escalonador}
 
+Um escalonador de processos (ou threads) é responsável por garantir que cada processo/thread consiga executar por algum determinado tempo na CPU. Existem diversos algoritmos de escalonamento, vários deles tendo sido implementados no EPOS. De acordo com Tanenbaum, há cinco dimensões que um escalonador deve levar em consideração em sua política de escalonamento \cite{tanenbaum}:
 
-\subsection{Modos de Operação}
-\label{sec:operating_modes}
-A arquitetura ARMv7 conta com 9 modos de operação (7 por padrão, mais 2 com extensões habilidadas), sendo que o único modo não privilegiado é o modo de usuário, os demais modos padrão possuem o mesmo privilégio dentro do sistema\footnote{O modo hipervisor possui certas funções que os demais modos não oferecem, mas no que diz respeito à acesso a memória e execução de instruções, ainda é o mesmo privilégio}. A principal diferença entre um modo e outro é que cada modo conta com um certo subconjunto privado de registradores banqueados, visiveis somente no modo em vigência, como ilustra a imagem \ref{fig:banked}. A tabela \ref{tab:processormode} ilustra quais são os modos de operação disponíveis \cite[p.~1139]{armarm}.
-O campo ``Codificação'' é usado no registrador CPSR para se verificar ou modificar o modo de operação vigente.
+\begin{enumerate}
+\item \textbf{Justeza (fairness):} Assegurar que cada processo consiga executar por um tempo just na CPU.
+\item \textbf{Eficiência:} Tentar manter a CPU ocupada pela maior parte do tempo.
+\item \textbf{Tempo de Resposta:} Minimizar o tempo de reposta para aplicações interativas.
+\item \textbf{Turnaround:} Minimizar o tempo que processos \emph{batch} precisam esperar para executar.
+\item \textbf{Vazão (throughput):} Maximizar a quantidade de tarefas realizadas por unidade de tempo.
+\end{enumerate}
 
-\begin{table}[ht]
-\centering
-\begin{tabular}{ccc}
-\hline\hline                        %inserts double horizontal lines
-Modo do processador  & Codificação & Implementado?\\ [0.5ex] % inserts table 
-%heading
-\hline                  % inserts single horizontal line
-User & 10000 & Sempre \\
-FIQ & 10001 & Sempre \\
-IRQ & 10010 & Sempre \\
-Supervisor & 10011 & Sempre\\
-Monitor & 10110 & Com extenções de segurança.\\
-Abort & 10111 & Sempre\\
-Hyp & 11010 & Com extenções de virtualização.\\
-Undefined & 11011 & Sempre\\
-System & 11111 & Sempre\\[1ex]
-\hline %inserts single line
-\end{tabular}
-\caption{Modos do processador. Codificação corresponde aos bits CPSR[4:0].}
-\label{tab:processormode} % is used to refer this table in the text
-\end{table}
+Claro que alguns destes itens são contraditórios, por isto a escolha de um algoritmo de escalonamento depende da aplicação e carga de trabalho que o sistema pretende lidar.
 
-\textbf{Modo Usuário:} Modo não-privilegiado de execução. Neste modo somente é possível de se fazer acesso não privilegiado aos recursos do hardware (não prodendo acessar as áreas protegidas). Não é possível de se mudar para outro modo de operação quando neste, a não ser por eventos externos como interrupções.
+\section{Sistema Embarcado}
 
-\textbf{Modo Sistema:} Modo privilegiado de execução. Este modo usa os mesmos registradores que o modo usuário e nenhuma exceção leva a este modo. Somente é possível de se entrar nesse modo alterando os bits do registrador de status do sistema (CPSR); é necessário já estar em algum modo privilegiado para tal operação.
+É cada vez mais difícil definir o que é um sistema embarcado. Hoje sistemas embarcados estão em todos os lugares, eles acionam motores, freios, cintos de segurança, airbags, sistemas de audio em um carro. Eles encodam digitalmente voz e constroem sinais de radio e enviam eles de um celular para uma estação. Eles controlam microondas, ar-condicionados, semáforos, etc.
 
-\textbf{Modo Supervisor:} É o modo padrão para no qual processador entra quando uma exceção do tipo \emph{Supervisor Call} é recebida.
-Para gerar um \emph{Supervisor Call}, usa-se a instrução \verb+svc+. O processador entra neste modo ao se resetar.
+Exitem sistemas embarcados dos mais diversos tamanhos e capacidades, desde aqueles com um \emph{clock} de poucos KHz, até processadores com GHz. Nem sequer podemos dizer que um sistema embarcado é ``dedicado'', já que os celulares de hoje em dia, que também são sistemas embarcados, estão cada vez mais próximos de um computador de propósito geral. Podemos dizer o que \emph{não} é um sistema embarcado: Notebooks, desktop, servidores e supercomputadores. É arriscar incorrer em erro tentar dar uma definição mais precisa.
 
-\textbf{Modo Abort:} Modo que o processador entra quando recebe uma interrupção do tipo \emph{prefetch abort} ou \emph{data abort}.
+\section{Sistema de Tempo Real}
 
-\textbf{Modo Indefinido:} Modo que o processador entra quando se tenta executar uma instrução não definida.
+Sistemas de tempo real são definidos como aqueles systems nos quais a corretude geral do sistema depende tanto da corretude funcional (produzir o resultado correto) quanto a corretude temporal (produzir o resultado dentro do tempo máximo de tolerância). A corretude temporal é pelo menos tão importante quanto a corretude funcional \cite{realtime}. Ou seja, cada tarefa não somente deve produzir o resultado correto, mas também produzi-lo dentro de um intervalo de tempo predeterminado. Note que nem todos os sistemas de tempo real são sistemas embarcados, apesar de existir uma grande área em comum. Os sistemas de tempo real podem ser classificados em duas categorias:
 
-\textbf{Modo FIQ:} Modo que o processador entra quando recebe uma interrupção FIQ.
+\begin{description}
+	\item[Hard real-time] Nesta categoria, as tarefas do sistemas devem necessariamente ser concluídas dentro do prazo, do contrário a resposta da tarefa já não faz mais sentido, e esta perda de prazo pode causar em uma falha catastrófica do sistema, possivelmente causando grande prejuízo e até mesmo por vidas humanas em risco.
+	\item[Soft real-time] Estes sistemas também precisam que suas tarefas sejam concluídas dentro do prazo, entretanto há certa tolerança à atrasos, e no lugar de causar uma falha no sistema, a sucessiva perda de prazos costuma causar degradação do desempenho do sistema.
+\end{description}
 
-\textbf{Modo IRQ:} Modo que o processador entra quando recebe uma interrupção IRQ.
+Exemplos de sistemas \emph{hard real-time} são vários. Imagine um sistema de detecção de mísseis, e que procura abater estes mísseis atirando neles. Fica claro que o tempo entre a detecção e a ação (atirar no míssil) está limitada à uma certa janela de tempo, e que a perda dessa janela de tempo pode resultar em ser acertado por um míssil \cite{realtime}.
 
-\textbf{Modo Hipervisor:} Este modo possui alguns privilégios a mais que os demais modos, mas somente existe quando as extenções de virtualização estão ativas (fora do escopo deste trabalho).
+Por outro lado, podemos imaginar também um reprodutor de vídeo. Cada \emph{frame} deve ser decodificado dentro de certa janela de tempo, do contrário aquele quadro pode não mais fazer sentido. Entretanto estes sistemas são tolerantes à perda de alguns quadros, portanto uma demora na codificação resulta numa degradação no desempenho (menor taxa de quadros por segundo), mas não evitam do vídeo não ser mais reproduzível. Este é um exemplo de sistema \emph{soft real-time}.
 
-\textbf{Modo Monitor:} Modo que o processador entra quando recebe uma interrupção \emph{Secure Monitor Call}, \verb+SMC+. Este modo está fora do escopo do trabalho.
+\section{Exceções e Interrupções}
+Na terminologia adotada pelo manual do Zynq, uma exceção é um evento inesperado, que interrompe o processando normal do programa, fazendo o registrador PC apontar para uma região específica de memória, onde o tratador daquela exceção reside. Estas exceções incluem erros de permissão de leitura de certa parte da memória, tentativa de execução de uma instrução inválida (mal formada), etc.
 
+Interrupções são bastante semelhantes à exceções. Elas param o fluxo normal de processamento, e também fazem com que a próxima instrução executada seja aquela numa região pré determinada da memória onde está o tratador daquela interrupção. A diferença esta no fato de interrupções poderem ser mascaradas, desativadas e gerenciadas pelo controlador de interrupção, enquanto não há controle sobre a execução das exceções (não são passíveis de desativação). Outra diferença, mais conceitual, é o fato que interrupções em geral são desejáveis e frequentemente necessárias para o funcionamento do sistema, enquanto exceções ocorrem apenas quando algo imprevisto é executado.
 
-\begin{figure}[ht!]
-	\centerline{
-    \includegraphics[width=12cm]{figuras/banked_registers}
-	}
-    \caption{Registradores banqueados.}
-	\label{fig:banked}
-\end{figure}
+A princípio, do ponto de vista do processador, uma interrução não tem muita diferença de uma exceção, por isto que no primeiro nível a interrupção é pré processada por um tratador de exceções, para então ser encaminhada para um tratador de interrupções (como mostra a figura \ref{fig:exception_handling}).
 
 
+\section{MMU} %http://epos.lisha.ufsc.br/EPOS+User+Guide#MMU
+A MMU (\emph{Memory Managemed Unit}) é um componente responsável por gerenciar a memória de um sistema. É este componente o responsável por traduzir o endereçamento lógico em endereçamento físico. Uma das principais vantagens de seu uso é a possibilidade de proteção de memória e facilitação da escrita de aplicativos, pois estes não precisam levar em consideração o mapa de memória do SO.
 
-\subsection{GIC}
-O GIC (\emph{Generic Interrupt Controller}) é um componente que centraliza e administra todas as interrupções do sistema, ativando, desativando, mascarando e priorizando as fontes de interrupção.
-
-
-\subsection{Tipos de Interrupção} %ug585 p. 192
-\label{sec:interrupt}
-\textbf{Interrupção Gerada por Software: }
-Cada CPU pode se interromper, interromper outra CPU, ou ambas CPUs usando SGIs (\emph{Software Generated Interrupts}). Existem 16 interrupções geradas por software, que podem ser geradas escrevendo o número da interrupção ([0-15]), junto com o número da CPU alvo no registrador ICDSGIR. Esta escrita ocorre dentro do barramento privado da própria CPU. Cada CPU possui seu próprio conjunto privado de registradores de SGIs para gerarem uma (ou mais) das 16 SGIs possíveis \cite[p.~216]{ug585.1.7}. É possível limpar uma interrupção lendo o registrador ICCIAR (\emph{Interrupt Acknowledge}) ou escrevendo 1 nos bits correspondentes do registrador ICDICPR (\emph{Interrupt Clear-Pending}).
-\\\\
-\textbf{Interrupções de Periféricos Privados da CPU: }
-Cada CPU está conectada a um conjunto privado de 5 interrupções de periféricos, são eles: Relógio Global (\emph{Global Timer}), nFIQ (\emph{Fast Interrupt}), Relógio privado da CPU, \emph{Watchdog} privado da CPU e nIRQ (interrupção vinda da lógica programável).
-\\\\
-\textbf{Interrupções de Periféricos Compartilhados: }
-Existem cerca de 60 interrupções de diversos modulos que podem ser roteadas para um ou ambos processadores, ou para a lógica programável. O GIC é responsável por administrar estas interrupções.
-
-
-Há também as interrupções\footnote{Na nomenclatura do manual, usa-se o termo exceção para os 6 diferentes tipos de interrupção, e de interrupção os diferentes tipos de interrupção IRQ ou FIQ (as categorias de interrupção descritas acima são do tipo IRQ). Durante este trabalho preferiu-se usar apenas o nome interrupção, pois assim não há ambiguidade com a palavra exceção no contexto de linguagens de programação.} geradas por alguma exceção, i.e. algum evento inesperado no fluxo de execução. Além das interrupções IRQ (contempladas acima) existem mais 5 tipos interrupções que devem ser contempladas. São elas:
-
-\textbf{FIQ \emph{Fast Interrupt}:} O modo FIQ possui um número maior de registradores banqueados que os demais modos (R8 até R13, além do SP, LR e SPSR), fazendo com que não seja necessário fazer troca de contexto. FIQs também tem mais alta prioridade que qualquer IRQ, pontanto este tipo de interrupção é apropriado para aplicações de tempo real de usuário único. Se multiplas aplicações tempo real usarem FIQ, pode haver conflitos de interesse que podem fazer um processo perder um \emph{deadline} \cite[p.~66]{armarm}.
-
-%FIQ mode is designed for efficient use by a single owner, using R8_fiq - R13_fiq as global variables. 
-%In addition, unlike IRQs, FIQs are not disabled by other exceptions (apart from reset), making them 
-%the preferred type for real time interrupts, when other exceptions are being used routinely, such as 
-%virtual memory or instruction emulation. IRQs may be disabled for unacceptably long periods of time 
-%while these needs are being serviced.
-%However, if more than one real-time interrupt source is required, there is a conflict of interest. The 
-%new mechanism allows multiple FIQ sources and minimizes the period with FIQs disabled, greatly 
-%reducing the interrupt latency penalty. The FIQ mode registers can be allocated to the highest priority 
-%FIQ as a single owner
-%ARM ARM p. 66.
-
-\textbf{Instrução não definida (\emph{Undefined Instruction}):} 
-Há duas situações que geram esta interrupção: Quando se executa instruções de coprocessador que não são reconhecidas por este, ou quando se executa instruções que não possuem significado para o processador \cite[p.~36]{armarm}. Normalmente este tipo de interrupção acontecerá quando o processador estiver lendo e tentando executar lixo de memória.
-
-
-\textbf{\emph{Prefetch Abort: }} Interrupção que leva ao modo \emph{Abort}. Este tipo de interrupção é sinalizado pelo sistema de memória (MMU). Através da MMU, é possível de se marcar certas regiões de memória como não executáveis; isto é importante de se fazer em regiões de memória que possuem dados sensíveis, de modo que quando o processador tentar ler aquela área para executar num futuro próximo, a MMU envia um sinal invalidando aquilo que foi lido. Quando o processador tenta executar uma instrução que tenha sido anteriormente invalidada, uma interrupção do tipo \emph{prefetch} ocorre \cite[p.~58]{armarm}. Note que é possível do processador ler aquela região para executar em seguida, mas ainda não gerar esta interrupção; isto ocorre quando o fluxo é desviado antes da tentativa de executar aquela instrução (por um \emph{branch} por exemplo).
-
-\textbf{\emph{Data Abort:}} Assim como a \emph{prefetch abort}, esta interrupção também leva ao modo \emph{Abort} (e somente estas duas interrupções). Este tipo de interrupção pode acontecer quando uma instrução tenta acessar uma região de memória que o modo atual de execução não tenha permissão para acessar. Acesso a regiões de memória virtual não mapeadas pela MMU também geram esta interrupção.
-
-
-%Source: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0068b/BABFCEEG.html
-\textbf{Interrupção de Software: } Existe uma instrução no assembly do ARMv7 que permite que seja feita uma interrupção de software (\verb+swi+). Esta instrução pode ser acompanhada de um número de 8 bits. Esta interrupção leva ao modo supervisor.
-
-\subsection{(\emph{Timers})}
-Cada um dos \emph{cores} possui um \emph{timer} privado de 32 bits e ambos \emph{cores} compartilham um \emph{timer} global de 64 bits. Estes \emph{timers} trabalham numa frequência sempre igual à metade da frequência da CPU.
-No nível de sistema (\emph{sistem-level (PS)}), há dois grupos independentes de \emph{timers}, cada grupo com 3 \emph{timers}.
-
-
-
-
-\subsection{\emph{Clocks}}
-
-%30 <= PS_CLK <= 60MHZ
-O \emph{clock} principal do sistema, chamado aqui de PS\_CLK (\emph{Processing System Clock}), é responsável por alimentar as 3 PLLs\footnote{\emph{Phase-Locked Loop}. É um sistema de controle que gera uma saída cuja fase é relacionada à fase do sinal de entrada. Pode ser usada para estabilizar um sinal e também multiplica-lo.} do sistema, sendo cada uma dessas PLLs responsável por uma parte diferente do sistema \cite[p.~622]{ug585}. O PS\_CLK é um \emph{clock} de baixa frequência, ficando entre 30 a 60 MHz (PS\_CLK é igual a 33.33 MHz no caso da Zedboard \cite[p.~19]{zed_manual}), sendo este multiplicado por cada uma das 3 PLLs para que o sistema funcione com velocidades maiores\footnote{Este clock pode ser multiplicado por um número de 1 a 127, e é multiplicado por 26 por padrão.}. As 3 PLLs são:
-
-\begin{itemize}
-	\item \textbf{I/O PLL:} Responsável por produzir o sinal de \emph{clock} para os dispositivos de entrada e saída.
-	\item \textbf{DDR PLL:} Responsável por produzir o sinal de \emph{clock} para as memórias da plataforma.
-	\item \textbf{ARM PLL:} Responsável por produzir o sinal de \emph{clock} do restante do sistema, incluindo os processadores.
-\end{itemize}
-
-A FPGA da Zedboard possui um \emph{clock} próprio e exclusivo. A figura \ref{fig:clocks} ilustra como estão dispostos estes \emph{clocks}.
-
-\begin{figure}[ht!]
-	\centerline{
-    \includegraphics[width=13cm]{figuras/clocks}
-	}
-    \caption{Diagrama de blocos dos \emph{clocks} disponíveis no Zynq. Note os \emph{clocks} da tabela \ref{tab:clocks} no canto superior direito da imagem.}
-	\label{fig:clocks}
-\end{figure}
-
-A Zedboard pode operar em dois modos (ou velocidades), denominados pela pela razão 6:3:2:1 e 4:2:2:1, abreviados como 6:2:1 e 4:2:1. Para alternar entre estes dois modos de velocidade, basta escrever 1 ou 0 no registrador CLK\_621\_TRUE. Estes números indicam quantas vezes cada \emph{clock} multiplica o \emph{clock} de base CPU\_1x, sendo este CPU\_1x um \emph{clock} derivado da ARM PLL, dividido por algum fator (configurável).
-
-Há 4 \emph{clocks} independentes, chamados de CPU\_6x4x, CPU\_3x2x, CPU\_2x e CPU\_1x. Esta nomenclatura dos \emph{clocks} indica o fator pelo qual o CPU\_1x é multiplicado em cada modo.
-O primeiro número do nome indica o fator multiplicativo daquele \emph{clock} no modo 6:2:1, e o segundo número indica o fator multiplicativo no modo 4:2:1.
-Por exemplo, no modo \textbf{6}:2:1, o CPU\_\textbf{6x}4x multiplica o CPU\_1x 6 vezes, e no modo \textbf{4}:2:1, o CPU\_6x\textbf{4x} multiplica o CPU\_1x 4 vezes. A tabela \ref{tab:clocks} ilustra a velocidade de cada \emph{clock} em cada um dos dois modos.
-
-\begin{table}[ht]
-	\centering
-	\begin{tabular}{ccc}
-		\hline\hline
-		Nomenclatura & \emph{Clock Ratio Mode} & Máxima frequência da CPU\\[0.5ex]
-		\hline
-		CPU\_6x4x & \multirow{4}{*}{6:3:2:1} & 667 MHZ\\
-		CPU\_3x2x &                          & 333 MHZ\\
-		CPU\_2x   &                          & 222 MHZ\\
-		CPU\_1x   &                          & 111 MHZ\\
-		\hline
-		CPU\_6x4x & \multirow{4}{*}{4:2:2:1} & 533 MHZ\\
-		CPU\_3x2x &                          & 267 MHZ\\
-		CPU\_2x   &                          & 267 MHZ\\
-		CPU\_1x   &                          & 133 MHZ\\[1ex]
-		\hline
-	\end{tabular}
-	\caption{Máximas frequências possíveis para cada configuração de \emph{clock}. Para uma lista mais completa (com as diferentes graduações de \emph{clock}), veja \cite[p.~13]{data_sheet}.}
-	\label{tab:clocks}
-\end{table}
-
-%\begin{figure}[ht!]
-%    \centering
-%    \includegraphics[width=8cm]{figuras/zedboard}
-%	\caption{Arquitetura do Zynq 7000.}
-%\end{figure}
-
-\subsection{UART}
+\section{UART}
 A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata da saída e entrada serial do sistema, portanto sendo o componente responsável por transmitir e receber caracteres, sendo necessário para impressão em tela, o que pode ser feito tanto por meio de um conector VGA quanto por USB (usado principalmente para depuração do código). As duas principais funções na classe da UART dentro do EPOS são justamente a put e get, para impressão e leitura de caractere, respectivamente. O Zynq possui duas UARTs.
 
 
+\section{\emph{Timer}}
 
-\subsection{MMU} %http://epos.lisha.ufsc.br/EPOS+User+Guide#MMU
+\emph{Timer} é um componente de hardware que pode ser configurado para contar um certo número de ciclos. Ao términio da contagem o \emph{timer} emite uma interrupção, que então o processador pode tratar. Este componente é fundamental para um escalonador de processos e threads.
 
-A MMU (\emph{Memory Managemed Unit}) é um componente responsável por gerenciar a memória de um sistema. É este componente o responsável por traduzir o endereçamento lógico em endereçamento físico. Uma das principais vantagens de seu uso é a possibilidade de proteção de memória e facilitação da escrita de aplicativos, pois estes não precisam levar em consideração o mapa de memória do SO.
 
-%%%%%%%%
-%		Get image from ug585 v1.7 p.79!
-%%%%%%%%
 \section{Ambiente de Desenvolvimento}
+
+%falar do qemu da xilinx
 
 O ambiente de desenvolvimento usado para o porte foi o qemu para ARM (\verb+qemu-system-arm+), para executar o EPOS num ambiente virtualizado (emulado), pois assim pode-se usar ferramentas como o GDB para a depuração do código. O uso do GDB foi fundamental para o desenvolvimento, já que com ele era possível imprimir o valor de cada registrador em um dado ponto da execução, verificar a memória, executar instruções específicas e etc. Para compilar o EPOS foi usado \emph{cross-compilers} para ARM. As flags usadas para criar um ambiente de depuração com o qemu e o GDB foram as sequintes (com cada comando feito em um terminal diferente):
 \hspace*{-1.0cm}\vbox{
