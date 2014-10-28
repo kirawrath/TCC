@@ -3,7 +3,7 @@
 %Relembar os objetivos
 
 A necessidade de um sistema operacional de tempo real de possuir suporte para uma plataforma embarcada \emph{multicore} motivou este trabalho, que objetivou implementar o suporte do EPOS para uma plataforma embarcada \emph{multicore}, a Zedboard.
-Neste trabalho foi discutido como se dá a interação software-hardware do sistema operacional com a placa, através do uso de mediadores de hardware, tanto no design do EPOS, quanto do interfaceamento fornecido pela placa. Em particular, a implementação dos mediadores de hardware do EPOS foi descrita.
+Neste trabalho foi discutido como se dá a interação software-hardware do sistema operacional com a placa, através do uso de mediadores de hardware, tanto no projeto do EPOS, quanto do interfaceamento fornecido pela placa. Em particular, a implementação dos mediadores de hardware do EPOS foi descrita.
 
 %future works
 %Falar dos algoritmos de escalonadores já implementados no EPOS, e que agora eles podem rodar no multicore implementado (preferencialmente teste isso, please)
@@ -12,7 +12,8 @@ Neste trabalho foi discutido como se dá a interação software-hardware do sist
 O EPOS é o o primeiro RTOS de código aberto a suportar os escalonadores de tempo real global, particionado e agrupado \cite{gio}. Assim sendo, este porte abre várias novas linhas de pesquisa de aplicação para este sistema operacional, em particular na área de escalonadores de tempo real.
 Uma possível nova aplicação do EPOS é o controle de um quadcóptero. Com os algoritmos de tempo real que estão implementados no makEPOS, e com os recursos da Zedboard, ampla pesquisa pode ser feita, e novos horizontes de aplicação se abrem.
 
-Em particular, como trabalho futuro, este porte pode servir para uma maior validação do escalonador feito em \cite{gio}, já que naquele trabalho foi usado um IA32 como plataforma de validação, que é uma arquitetura de menor previsibilidade que a Zedboard.
+%Citar também os contadores de desempenho em hardware o lock e unlock da cache compartilhada, escalonamento heterogêneo.
+Como trabalho futuro, este porte pode servir para uma maior validação do escalonador feito em \cite{gio}, pois a Zedboard possui os recursos de hardware necessários para sua implementação (\emph{lock/unlock} de linhas de cache, contadores de desempenho e capacidade de configurar a CPU-alvo de uma interrupção), e naquele trabalho foi usado um IA32 como plataforma de validação, que é uma arquitetura de menor previsibilidade que a Zedboard, e portanto essa pesquisa teria uma sustentação melhor sendo aplicada nesta placa.
 
 
 %final remarks

@@ -1,17 +1,21 @@
 \chapter{Conceitos Básicos}
 
-Esta seção tem por objetivo o estabelecimento dos conceitos básicos necessários ao entendimento do restante do trabalho. Não pretende-se aqui fazer uma explicação extensiva e profunda sobre os conceitos aqui expostos, mas sim uma breve introdução, deixando os detalhes para serem procurados pelo leitor interessado nas referências aqui colocadas.
+Esta seção tem por objetivo o estabelecimento dos conceitos básicos necessários ao entendimento do restante do trabalho. Não pretende-se aqui fazer uma explicação extensiva e profunda sobre os conceitos expostos, mas sim uma breve introdução, deixando os detalhes para serem procurados pelo leitor nas respectivas referências.
+%Listar os nomes mais usados aqui, como MMU, timer, etc, e escrever um parágrafo simples fxemalando o que conceitualmente estes componentes são, sem chegar nas específicidades do hardware, nem tocar nos conceitos do EPOS.
 
-%Listar os nomes mais usados aqui, como MMU, timer, etc, e escrever um parágrafo simples falando o que conceitualmente estes componentes são, sem chegar nas específicidades do hardware, nem tocar nos conceitos do EPOS.
+\section{Traits}
+
+%TODO
 
 \section{Metaprogramação estática}
 Metaprograma é um program que representa e manipula outros programas ou eles próprios \cite{generative}.
-Com metaprogramação é possível fazer-se loops (através de recursão), e condicionais (como o \verb+IF+ discutido abaixo), fazendo com que metaprogramas tenham equivalência com uma máquina de turing \cite{generative}. De fato, a linguagem de metaprogramação de C++ pode ser vista como uma linguagem funcional que tem sua execução em tempo de compilação. Pode-se fazer muitas estruturas metaprogramadas, inclusive listas, árvores e etc, entretanto nesta seção será mostrado apenas o funcionamento básico de um \verb+IF+ metaprogramado, pois este é bastante usado no código do EPOS. Para um maior entendimento sobre o assunto, fica aqui recomendado o livro referenciado.
+Com metaprogramação é possível fazer-se loops (através de recursão), e condicionais (como o \verb+IF+ discutido abaixo), fazendo com que metaprogramas tenham equivalência com uma máquina de turing \cite{generative}. De fato, a linguagem de metaprogramação do C++ pode ser vista como uma linguagem funcional que tem sua execução em tempo de compilação. Pode-se fazer muitas estruturas metaprogramadas, inclusive listas, árvores e etc, entretanto nesta seção será mostrado apenas o funcionamento básico de um \verb+IF+ metaprogramado, pois este é bastante usado no código do EPOS. Para um maior entendimento sobre o assunto, fica aqui recomendado o livro referenciado \cite{generative}.
 
 A arquitetura do EPOS usa pesadamente de metaprogramação estática para, em tempo de compilação, selecionar a arquitetura, bem como cada componente que será ou não utilizado. Por exemplo, podemos definir um \verb+if+ estático para selecionar de qual classe a classe Chronometer irá derivar. Primeiramente a definição do \verb+if+:
 
 \begin{verbatim}
-template<bool condition, typename Then, typename Else> struct IF
+template<bool condition, typename Then, typename Else>
+struct IF
 {
     typedef Then Result;
 };
@@ -21,14 +25,15 @@ Este template, a princípio, nada mais faz do que tomar 3 parâmetros e então c
 
 \hspace*{-1.5cm}\vbox{
 \begin{verbatim}
-template<typename Then, typename Else> struct IF<false, Then, Else>
+template<typename Then, typename Else>
+struct IF<false, Then, Else>
 {
     typedef Else Result;
 };
 \end{verbatim}
 }
 
-Com esta especialização, toda vez que o primeiro parâmetro resolver-se como falso, \verb+Result+ será definido como o terceiro parâmetro. Temos, portanto, um \verb+if+ metaprogramado funcional, agora voltemos ao exemplo do chronometro.
+Com esta especialização, toda vez que o primeiro parâmetro resolver-se como falso, \verb+Result+ será definido como o terceiro parâmetro. Temos, portanto, um \verb+if+ metaprogramado funcional, agora voltemos ao exemplo do cronômetro.
 
 Suponha que caso a arquitetura não seja multicore, e nos traits o TSC (\emph{time stamp clock}) esteja ativo, então deseja-se que Chronometer derive de TSC\_Chronometer, do contrário de Alarm\_Chronometer.
 
@@ -41,14 +46,16 @@ TSC_Chronometer, Alarm_Chronometer>::Result
 {/*class body*/};
 \end{verbatim}
 
-Deste modo, Chronomometer derivará de \verb+IF::Result+, que será resolvido como TSC\_Chronometer ou Alarm\_Chronometer. Note que esse exemplo também mostra um uso do Traits, onde para descobrir se o TSC está ativo, bastou ler a constante \verb+Traits<TSC>::enabled+, e, para saber se o sistema é multicore, bastou ler \verb+Traits<System>::multicore+. Todo esse processamento causa zero \emph{overhead} em tempo de execução.
+Deste modo, \verb+Chronomometer+ derivará de \verb+IF::Result+, que será resolvido como TSC\_Chronometer ou Alarm\_Chronometer. Note que esse exemplo também mostra um uso do Traits, onde para descobrir se o TSC está ativo, bastou ler a constante \verb+Traits<TSC>::enabled+, e, para saber se o sistema é multicore, bastou ler \verb+Traits<System>::multicore+. Todo esse processamento causa zero \emph{overhead} em tempo de execução.
 
 \section{Registradores Mapeados em Memória}
-A maneira usada para se comunicar, configurar e ler o estado de um dado componente de hardware é através da leitura e/ou escrita em registradores mapeados em memória. Um registrador mapeado em memória basicamente é uma região fixa da memória, onde uma escrita naquela posição indica uma escrita no registrador lá mapeado.
-Exemplificando, a UART possui um registrador chamado rcvr\_timeout\_reg0, responsável por indicar quantos ciclos\footnote{Na realidade é o número de baud\_samples que se passaram.} a UART deve esperar um novo caractere chegar antes de emitir uma interrupção de \emph{timeout}. Este registrador está mapeado na posição de memória 0xE000001C para a UART0. Portanto, para configurar que o número de ciclos esperado seja de 20, basta escrever este número naquela posição. Uma maneira de fazer esta escrita, por exemplo, em C/C++, é: \verb+*((unsigned long*)0xE000001C) = 20;+.
+Uma maneira usada para se comunicar, configurar e ler o estado de um dado componente de hardware é através da leitura e/ou escrita em registradores mapeados em memória. Um registrador mapeado em memória basicamente é uma região fixa da memória, onde uma escrita naquela posição indica uma escrita no registrador lá mapeado.
+Exemplificando, a UART da Zedboard possui um registrador chamado rcvr\_timeout\_reg0, responsável por indicar quantos ciclos\footnote{Na realidade é o número de baud\_samples que se passaram.} a UART deve esperar um novo caractere chegar antes de emitir uma interrupção de \emph{timeout}. Este registrador está mapeado na posição de memória 0xE000001C para a UART0. Portanto, para configurar que o número de ciclos esperado seja de 20, basta escrever este número naquela posição. Uma maneira de fazer esta escrita, por exemplo, em C/C++, é: \verb+*((unsigned long*)0xE000001C) = 20;+.
 
 \section{Orientação a Objetos}
 Programação orientada a objetos é um método de implementação no qual programas são organizados como coleções cooperantes de objetos, cada qual representa uma instância de alguma classe, sendo que estas classes são todas membros de uma hierarquia de classes unidas por relações de herança \cite{OOAD}.
+
+%TODO
 
 
 \section{Sistema Operacional}
@@ -78,7 +85,7 @@ A vantagem de threads sobre processos é que a comunicação entre threads de um
 Um escalonador de processos (ou threads) é responsável por garantir que cada processo/thread consiga executar por algum determinado tempo na CPU. Existem diversos algoritmos de escalonamento, vários deles tendo sido implementados no EPOS. De acordo com Tanenbaum, há cinco dimensões que um escalonador deve levar em consideração em sua política de escalonamento \cite{tanenbaum}:
 
 \begin{enumerate}
-\item \textbf{Justeza (fairness):} Assegurar que cada processo consiga executar por um tempo just na CPU.
+\item \textbf{Justiça (Fairness):} Assegurar que cada processo consiga executar por um tempo justo na CPU.
 \item \textbf{Eficiência:} Tentar manter a CPU ocupada pela maior parte do tempo.
 \item \textbf{Tempo de Resposta:} Minimizar o tempo de reposta para aplicações interativas.
 \item \textbf{Turnaround:} Minimizar o tempo que processos \emph{batch} precisam esperar para executar.
@@ -107,7 +114,7 @@ Exemplos de sistemas \emph{hard real-time} são vários. Imagine um sistema de d
 Por outro lado, podemos imaginar também um reprodutor de vídeo. Cada \emph{frame} deve ser decodificado dentro de certa janela de tempo, do contrário aquele quadro pode não mais fazer sentido. Entretanto estes sistemas são tolerantes à perda de alguns quadros, portanto uma demora na codificação resulta numa degradação no desempenho (menor taxa de quadros por segundo), mas não evitam do vídeo não ser mais reproduzível. Este é um exemplo de sistema \emph{soft real-time}.
 
 \section{Exceções e Interrupções}
-Na terminologia adotada pelo manual do Zynq, uma exceção é um evento inesperado, que interrompe o processando normal do programa, fazendo o registrador PC apontar para uma região específica de memória, onde o tratador daquela exceção reside. Estas exceções incluem erros de permissão de leitura de certa parte da memória, tentativa de execução de uma instrução inválida (mal formada), etc.
+Na terminologia adotada neste trabalho, uma exceção é um evento inesperado, que interrompe o processando normal do programa, fazendo o registrador PC apontar para uma região específica de memória, onde o tratador daquela exceção reside. Estas exceções incluem erros de permissão de leitura de certa parte da memória, tentativa de execução de uma instrução inválida (mal formada), etc.
 
 Interrupções são bastante semelhantes à exceções. Elas param o fluxo normal de processamento, e também fazem com que a próxima instrução executada seja aquela numa região pré determinada da memória onde está o tratador daquela interrupção. A diferença esta no fato de interrupções poderem ser mascaradas, desativadas e gerenciadas pelo controlador de interrupção, enquanto não há controle sobre a execução das exceções (não são passíveis de desativação). Outra diferença, mais conceitual, é o fato que interrupções em geral são desejáveis e frequentemente necessárias para o funcionamento do sistema, enquanto exceções ocorrem apenas quando algo imprevisto é executado.
 
@@ -139,4 +146,5 @@ qemu-system-arm -no-reboot -nographic -s -S -machine xilinx-zynq-a9\
 arm-none-eabi-gdb -ex "target remote :1234"
 \end{verbatim}
 }
+
 O hardware real também estava disponível, e foi usado quando quando o qemu não produzia resultados confiáveis. Com o hardware real, para a depuração do código foi usado o JTAG.

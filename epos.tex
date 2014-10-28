@@ -53,6 +53,19 @@ Interface inflada basicamente é uma interface que declara os métodos de todas 
 
 \section{Modos de Compilação}
 
+\section{Inicialização}
+
+O EPOS inicia executando um conjunto de códigos escritos em assembly, chamados de crts.
+No crt, a primeira tarefa feita na inicialização do EPOS é a configuração das pilhas do sistema. Feito isto, o EPOS trata de limpar a seção .bss, para futuro reuso.
+Antes de ser chamado o construtor dos demais objetos globais, a UART e Display são inicializados, assim é possível mais facilmente depurar o código dos construtores.
+Então o EPOS começa a chamar o construtor global de cada componente do sistema. O crt consegue localizar onde está localizado cada construtor devido à forma como o EPOS foi compilado e ligado (\emph{linked}). A figura \ref{fig:initialization} ilustra num diagrama de sequência a ordem de construção dos objetos globais.
+
+\fig{0.58}{initialization}{Diagrama de sequência da inicialização do EPOS}
+
+Primeiro é construído o \verb+First_Object+, cuja principal função é apenas ser um ponto de entrada conhecido para o primeiro objeto do sistema.
+Em seguida, é construído \verb+Init_System+. É neste construtor que todos os mediadores de hardware são construídos, com exceção da UART que já foi previamente construída no crt. Neste construtor, primeiramente é inicializado o \emph{timer}, MMU, e, se disponível, o TSC (\emph{Time Stamp Counter}). Em seguida o construtor aloca uma porção de memória para futuro uso da heap do sistema. Feito isto, o SCU (\emph{Snoop Control Unit}), tratador de interrupções e alarme são também construídos.
+
+\verb+Init_Application+ é responsável por alocar a heap da aplicação, através da requisição de páginas da MMU. \verb+Init_First+ chama o inicializador das \emph{threads}, que então inicializa a \emph{thread} da aplicação e a \emph{idle thread}, que é uma \emph{thread} especial que é executada quando o escalonador não encontra outra \emph{thread} pronta para executar. Em seguida à criação destas \emph{threads}, é chamado \verb+context->load()+ da \emph{thread} da aplicação, fazendo com que o fluxo de execução seja finalmente transferido para a aplicação.
 
 \section{Traits}
 
@@ -114,11 +127,11 @@ A figura \ref{fig:mmu_translation} ilustra a interação entre os conteúdos das
 %\fig{0.42}{mmu_translation}{Interação entre \verb+Directory+ e \verb+Page_Table+ com a memória física.}
 
 
-\fig{0.22}{mmu_translation}{Interação entre Directory e Page\_Table com a memória física. Neste exemplo, o endereço virtual 0xAB2FF1234 seria traduzido para o endereço físico 0xDEAD11234. A última posição de memória física indexável neste exemplo é 0x1FFFF\_\_\_ pois a Zedboard dispõe de 512MB.}
+\fig{0.45}{mmu_translation}{Interação entre Directory e Page\_Table com a memória física. Neste exemplo, o endereço virtual 0xAB2FF123 seria traduzido para o endereço físico 0xDEAD1123. A última posição de memória física indexável neste exemplo é 0x1FFFF\_\_\_ pois a Zedboard dispõe de 512MB.}
 
 \verb+Directory+ não sabe a qual \verb+Chunk+ uma determinada \verb+Page_Table+ pertence, e a tradução de endereços pode ocorrer independente desta informação. Na figura \ref{fig:mmu} é ilustrada a interação entre as classes discutidas.
 
-\fig{0.42}{mmu}{Diagrama de classes da MMU.}
+\fig{0.20}{mmu}{Diagrama de classes da MMU.}
 
 
 %make a diagram showing how MMU alloc a physical page, and how the heap lends pages that were already allocated in the MMU's point of view.
@@ -168,6 +181,25 @@ _timer = new (SYSTEM) Alarm_Timer(handler);
 
 %falar dos escalonadores que o EPOS suporta
 %falar do gio <3
+
+O EPOS suporta diversos escalonadores, desde os de propósito geral até escalonadores de tempo real \emph{multicore}.
+Do primeiro tipo, temos o \emph{Round Robin} e \emph{First-Come, First-Served}, do segundo, \emph{Rate Monotonic}, \emph{Deadline Monotonic} e \emph{Earliest Deadline First} (global, particionado e agrupado), e também o escalonador descrito em \cite{gio}.
+
+\fig{0.30}{edf_uml}{Diagrama de classes para os escalonadores que usam a política \emph{Earliest Dealine First} \cite[p.~184]{gio}.}
+
+O EPOS é projetado de modo a permitir grande reuso ao se escrever um escalonador. Por exemplo, há três escalonadores que utilizam a política EDF (\emph{Earliest Deadline First}), que nada mais é que um critério de escolha de \emph{thread}, onde neste caso procura-se escolher aquela cujo \emph{dealine} está mais próximo, por isto separou-se esta parte das especificidades que existem entre os escalonadores. 
+
+A figura \ref{fig:edf_uml} ilustra a relação entre as classes dos escalonadores que herdam de EDF.  Não é o objetivo deste trabalho entrar em detalhe nas especificidades dos diferentes escalonadores do EPOS, entretanto será colocada uma breve descrição destes três escalonadores EDF para que a figura fique clara.
+
+\begin{description}
+
+\item[PEDF:] O \emph{partitioned} EDF (particionado) possui uma fila de tarefas a serem escalonadas para cada processador. A escolha de que fila cada tarefa é atribuida é feita de forma estática. Cada tarefa executa sempre no mesmo processador, não havendo migração destas. 
+
+\item[GEDF:] O EDF global utiliza uma única fila de tarefas, e atribui uma tarefa toda vez que um processador fica livre. A vantagem deste escalonador sobre o PEDF é que ele consegue escalonar conjuntos de tarefas que o PDF não conseguiria, entretanto seu desempenho costuma ser menor e menos previsível, pois migrar uma tarefa de um processador para o outro é custoso, e gera um mal aproveitamento das memórias \emph{cache}.
+
+\item[CEDF:] Este é o caso geral do PEDF e GEDF. Neste escalonador há uma fila para cada grupo de processadores (\emph{cluster}). Por exemplo, numa arquitetura que usa 8 processadores, poder-se-ia fazer 4 grupos de 2 processadores cada, totalizando 4 filas. Somente há migração de tarefas entre processadores de um mesmo grupo. Caso o grupo seja do tamanho do número de cores, tem-se o GEDF, e se cada grupo tiver apenas um processador, obtem-se o PEDF.
+
+\end{description}
 
 
 

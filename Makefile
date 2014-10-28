@@ -10,5 +10,5 @@ bib: clean
 	
 clean:
 	rm -f main.aux  main.blg  main.lof  main.lot  main.out  main.toc\
-		main.bbl  main.las  main.log  main.lsb  main.pdf output/*
+		main.bbl  main.las  main.log  main.lsb  main.pdf output/* 
 

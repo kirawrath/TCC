@@ -3,11 +3,11 @@
 % Eu poderia descrever como eu tenho que incluir cada classe feita em ./include/system/types.h, opções de traits, etc..
 
 
-%TODO load/save context -> are they updating TTBR0?
+%TODO load/save context -> are they updating TTBR0? No, they are not.
 
 Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões tomadas.
 
-A grosso modo, o processo de inicialização da CPU envolve \cite[p.~110]{ug585.1.7}:
+A grosso modo, o processo de inicialização do sistema envolve \cite[p.~110]{ug585.1.7}:
 
 %
 % Fazer imagem BONITA sobre a table abaixo
@@ -57,9 +57,8 @@ O valor padrão de BDIV é 15, portanto, fixando-se este valor e resolvendo a eq
 
 Após estas configurações, dentre outras que o manual descreve, a UART está pronta para ser usada. Os dois principais métodos usados da UART são o \verb+put+ e o \verb+get+, o primeiro escreve um caractere na saída serial, sendo que este pode ser lido, por exemplo através de uma entrada USB, para imprimir estes caracteres numa tela; algo muito útil para depuração.
 
+
 \section{Mediador do \emph{Timer}}
-
-
 
 Um \emph{timer} permite contar um certo número de ciclos, e, ao final da contagem, ele emite uma interrupção ao GIC, para que então o processador trate este evento. Entretanto note que é possível de existir mais \emph{timers} sendo usados logicamente do que \emph{timers} físicos disponíveis, significando que um mesmo \emph{timer} deve conseguir servir a mais de uma requisição simultaneamente.
 
@@ -304,8 +303,6 @@ Com o número da interrupção em mãos, pode-se então chamar o tratador daquel
 Normalmente, interrupções de \emph{timer} são o tipo mais frequente de interrupção durante a execução do sistema. Dele dependem o escalonador de processos (ou \emph{threads}), Delay, Chronometer e Alarm. Como mencionado na seção do porte do \emph{timer}, uma mesma interrupção pode gerar a chamada de mais de um handler, como a do \emph{timer} que chama a do Alarm e do escalonador. Com isto fica ilustrado que uma única interrupção pode gerar a chamada de vários tratadores para esta mesma interrupção.
 
 
-
-
 \section{MMU}
 \label{sec:mmu}
 %nice image in p.87 ug585
@@ -420,6 +417,27 @@ Após feita as tabelas, a MMU está pronta para ser ativada. A MMU é controlada
 
 \section{Mediador da CPU}
 
+O mediador da CPU encapsula uma série de funções/rotinas usadas pelo sistema. A maior parte destas funções precisam ser escritas diretamente em assembly, ou usam informações dependente de arquitetura. Este mediador não precisa ser instanciado nem inicializado, ele é apenas um conjunto de funções necessárias por outros componentes.
+
+Entre as funções deste mediador estão:
+
+\begin{itemize}
+
+\item Ativar/desativar máscara de interrupções de um dado processador.
+\item Rotinas para desligar, suspender e reiniciar o sistema.
+\item Função usada pelo escalonador para fazer a troca de contexto.
+\item Salvar/alterar registrador que guarda o endereço base da tabela de páginas.
+\item Funções primitivas usadas em semáforos e mutexes, como tsl (\emph{test and set lock}), finc e fdec.
+\item Inicializar CPU 1.
+\item Funções para escrita/leitura de registradores.
+
+\end{itemize}
+
+
+Nesta classe também há uma classe interna chamada \verb+Context+. Ela possui funções para salvar e carregar o contexto do processador, e atributos para salvar cada registrador de propósito geral da arquitetura (incluindo sp e pc e cpsr). Esta classe é usada no momento da criação de uma \emph{thread}, e durante a troca de contexto.
+
+
+
 \section{Mediador SCU}
 
 \section{Multicore}
@@ -428,7 +446,7 @@ Ao se ligar a placa, apenas a CPU0 executa código, e é função dela fazer as 
 
 Isto é suficiente para fazer o segundo processador passar a executar código, entretanto esta é a parte simples, ter dois processadores rodando tem várias implicações sobre como deve ser o \emph{design} de cada componente do sistema, pois agora há a preocupação com coerência e consistência de memória, condições de corrida {\emph{racing conditions}) e etc.
 
-	Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, assim como seu\emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como citado na seção anterior.
+Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, assim como seu\emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como citado na seção anterior.
 
 
 
