@@ -2,16 +2,12 @@
 
 % Eu poderia descrever como eu tenho que incluir cada classe feita em ./include/system/types.h, opções de traits, etc..
 
-
-%TODO load/save context -> are they updating TTBR0? No, they are not.
-
 Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões tomadas.
 
 A grosso modo, o processo de inicialização do sistema envolve \cite[p.~110]{ug585.1.7}:
 
-%
 % Fazer imagem BONITA sobre a table abaixo
-%
+
 \begin{enumerate}
 	\item Definir a tabela de vetores.
 	\item Invalidar \emph{caches}, TLB, \emph{branch predictor}
@@ -24,8 +20,6 @@ A grosso modo, o processo de inicialização do sistema envolve \cite[p.~110]{ug
 \end{enumerate}
 
 Estes e outros passos (como inicialização do GIC) são explicados em detalhe nas seções que seguem.
-
-
 
 
 \section{Mediador da UART}
@@ -120,7 +114,6 @@ Ou de maneira mais simples:
 	\text{load\_value} = \frac{\text{F\_dec}}{F}
 \end{equation}
 Precisamos agora definir o \verb+prescaler+. Definimos ele como a razão entre o \emph{clock} do sistema pela frequência desejada ($\text{prescaler}=\frac{\text{clock}}{2 \times F}$). Há a premissa de que a frequência desejada não será maior que a do \emph{clock} do \emph{timer}, pois é impossível contar mais rápido que isto. Normalmente esta razão ($\frac{\text{clock}}{2 \times F}$) será um número maior que 255, já que o clock costuma ser muito mais rápido, e como o campo onde se registra o valor do prescaler possui apenas 8 bits, frequentemente o prescaler será 255.
-
 
 
 \section{Mapeamento de Memória}
@@ -235,8 +228,8 @@ O processador, ao receber uma interrupção, (portanto as interrupções estão 
 
 O principal tratador é o tratador de interrupções IRQ (\verb+irc_handler+), sendo que este precisa ser discutido com mais profundidade. Abaixo segue o código deste tratador:
 
-\hspace*{-1.5cm}\vbox{
-\begin{verbatim}
+\hspace*{-1cm}\vbox{
+\begin{lstlisting}
 43 void _irq_handler() {
 44   ASMV(
 45   // A few definitions
@@ -263,8 +256,8 @@ O principal tratador é o tratador de interrupções IRQ (\verb+irc_handler+), s
 66   "stmfd sp!, {r1} \n"   // save irq-spsr
 67       
 68   );
-\end{verbatim}
-\begin{verbatim}
+\end{lstlisting}
+\begin{lstlisting}
 71   IC::int_handler();
 72     
 73   ASMV(        
@@ -276,7 +269,7 @@ O principal tratador é o tratador de interrupções IRQ (\verb+irc_handler+), s
 79   //spsr to be restored into svc_cpsr
 80   );
 81 }
-\end{verbatim}
+\end{lstlisting}
 }
 
 Após selecionar qual handler chamar, o processador muda de modo, indo, no caso de uma interrupção IRQ, para o modo de execução IRQ. Neste modo há 3 registradores banqueados: O SPSR, que contém o valor do registrador CPSR imediatamente antes da interrupção, sendo necessário para que seja possível restaurar o valor original do CPSR após tratar a interupção; o LR (\emph{link register}), que contém o endereço da próxima instrução que seria executada imediatamente antes da interrupção mais 4; e, finalmente, o SP (\emph{stack pointer}), que aponta para a pilha própria desde modo (cada modo pode possuir sua própria pilha).
@@ -440,7 +433,7 @@ static Phy_Addr calloc(unsigned int frames = 1) {
 }
 \end{lstlisting}
 
-\fig{0.5}{memory_map}{Mapeamento de memória adotado. Os primeiros 512MB de memória virtual são mapeados 1:1 para a memória física, enquanto os 512MB de memória virtual seguintes mapeiam para os os mesmos 512MB de memória física.}
+\fig{0.6}{memory_map}{Mapeamento de memória adotado. Os primeiros 512MB de memória virtual são mapeados 1:1 para a memória física, enquanto os 512MB de memória virtual seguintes mapeiam para os os mesmos 512MB de memória física. De 1GB à 4GB é um mapeamento simples 1:1, referentes aos registradores mapeados em memória.}
 
 \verb+memset+ irá tentar escrever no endereço enviado como parâmetro, que será interpretado como um endereço virtual, que então será traduzido para um físico correspondente. Entretanto no lugar de um endereço físico, é enviado o endereço lógico no lugar, para que este seja então traduzido para o endereço físico que desejamos. Esta é uma maneira do SO internamente burlar a tradução da MMU.
 

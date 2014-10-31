@@ -8,13 +8,15 @@
 \usepackage{color} %syntax highlighting
 \usepackage{listings}
 
+
 \definecolor{mygreen}{rgb}{0,0.5,0}
 \definecolor{myblue}{rgb}{0,0,0.6}
 \definecolor{myred}{rgb}{0.6,0,0}
 
 \lstset{
   language=C++,
-  showspaces=true,
+  showspaces=false,
+  showstringspaces=false,
   extendedchars=true,
   tabsize=4,
   basicstyle=\footnotesize,        % size of fonts used for the code
@@ -60,6 +62,8 @@
 	\end{figure}
 }
 \usepackage[T1]{fontenc}
+\usepackage{datetime}
+
 \hyphenation{meta-pro-gra-ma-ção}
 
 %----------------------------------------------------------------------
@@ -68,51 +72,57 @@
 \instituicao[a]{Universidade Federal de Santa Catarina} % Opcional
 \departamento[a]{INE}
 \curso[a]{Universidade Federal de Santa Catarina}
-\documento[o]{Trabalho de conclusão de curso} % [o] para dissertação [a] para tese
+\documento[o]{Trabalho de Conclus\~{a}o de Curso} % [o] para dissertação [a] para tese
 \titulo{Portando o EPOS para a Zedboard}
 %\subtitulo{Subtítulo (se houver)} % Opcional
 \autor{Bruno Farias de Loreto}
 \grau{Bacharel em Ciências da Computação}
 \local{Florianópolis} % Opcional (Florianópolis é o padrão)
-\data{22}{Fevereiro}{2014}
+
+\data{\the\day}{Novembro}{\the\year}
 
 \orientador[Orientador\\Universidade Federal de Santa Catarina]{Prof. Dr. Antônio Augusto Fröhlich}
 \coorientador[Coorientador\\Universidade Federal de Santa Catarina]{Prof. Dr. Giovani Gracioli}
 \coordenador[Coordenador\\Universidade Federal de Santa Catarina]{Prof. Dr. Vitório Bruno Mazzola}
 
 \numerodemembrosnabanca{4} % Isso decide se haverá uma folha adicional
-\orientadornabanca{nao} % Se faz parte da banca definir como sim
+\orientadornabanca{sim} % Se faz parte da banca definir como sim
 \coorientadornabanca{sim} % Se faz parte da banca definir como sim
-\bancaMembroA{Arliones Stevert Hoeller Junior\\Universidade Federal de Santa Catarina}
-\bancaMembroB{Hugo Marcondes\\Universidade Federal de Santa Catarina}
+\bancaMembroA{Prof. Dr. Arliones Stevert Hoeller Junior\\Universidade Federal de Santa Catarina}
+\bancaMembroB{Prof. Me. Hugo Marcondes\\Universidade Federal de Santa Catarina}
 %\bancaMembroC{... \\...}     % Nome do membro da Banca
 %\bancaMembroD{... \\...}       % Nome do membro da Banca
-%\bancaMembroE{Quinto membro\\Universidade ...}       % Nome do membro da Banca
+%\bancaMembroE{Quinto membro\\Universidade ...}  % Nome do membro da Banca
 
-%\dedicatoria{Este trabalho é dedicado a ...}
+\dedicatoria{}
 
-\agradecimento{Agradeço ao Goku por ter derrotado o Freeza, aos resumos da Thaís, e às pessoas que jogaram Magic comigo. Agradeço também aos happy hours e ao 9gag, pois sem eles eu teria me formado cedo demais.
+\agradecimento{Agradeço ao Goku por ter derrotado o Freeza, aos resumos da Thaís, e às pessoas que jogaram Magic comigo. Agradeço também aos happy hours, pois sem eles eu teria me formado cedo demais. 
 
-Faço um agradecimento especial à todos os UFSCães por existirem, e ao RU por me manter vivo.
-Eu também não poderia esquecer de agradecer ao stackoverflow, à todas as pessoas que fazem tutoriais com código de exemplo, e a todos os adoradores do software livre.
+Faço um agradecimento especial à todos os UFSCães, simplesmente por existirem, e ao RU por me manter vivo.
+Eu também não poderia esquecer de agradecer ao stackoverflow, à todas as pessoas que fazem tutoriais na internet, e a todos os adoradores do software livre.
 
-Finalmente, um beijo no coração para todos aqueles que desejam falir a Microsoft.
+
+Finalmente, um beijo no coração para todos aqueles que desejam falir a Microsoft, e dois beijos para quem não votou no PSDB.
 }
 
 \epigrafe{So long, and thanks for all the fish!\\\emph{- Douglas Adams.}}
 %{(Autor da epígrafe, ano)}
 
 \textoResumo {
-	No mundo dos sistemas operacionais embarcados, há uma grande variedade de diferentes arquiteturas, e, consequentemente, um sistema operacional embarcado necessita dar suporte a um bom número de arquiteturas para ser usável em diversos cenários. 
-	O sistema operacional EPOS possui uma arquitetura que tenta ser o mais independente de plataforma possível, entretanto o interfaceamento entre o software e hardware inevitavelmente necessita ser reescrito.
-	Este trabalho visa descrever e documentar como o sistema operacional EPOS foi portado para a plataforma Zedboard.
+	Com o aumento da demanda de poder de processamento dos sistemas embarcados atuais, tornou-se necessário que um sistema operacional embarcado tenha suporte para arquiteturas multicores embarcadas.
+	Um sistema operacionanal embarcado tendo suporte para tal plataforma, possibilita novas linhas de pesquisa, e novos cenários de aplicação do SO, como por exemplo a integração de um escalonador \emph{multicore} de tempo real para gerenciar tarefas críticas.
+	O sistema operacional EPOS não possui suporte para um arquitetura embarcada \emph{multicore}, e tem sido cada vez mais necessário a existência de tal suporte.
+	O EPOS possui uma arquitetura que tenta ser o mais independente de plataforma possível, entretanto o interfaceamento entre o software e hardware inevitavelmente necessita ser reescrito para cara arquitetura.
+Este trabalho visa descrever e documentar como o sistema operacional EPOS foi portado para a plataforma embarcada \emph{multicore} Zedboard.
 }
 \palavrasChave {Systemas Operacionais. Portabilidade. EPOS.}
  
 \textAbstract {
-	In the operating systems field, there are a wide variety of different architectures, therefore an operating system must support a reasonable number of architectures in order to be implanted in a wide range of scenarios.
-	EPOS operating system aims on portability, however the software-hardware interface inevitably must be rewritten for each platform.
-	This work aims on describing and documenting how the operating system EPOS was ported to Zedboard's platform.
+	With the increasing demand for processing power from nowadays embedded systems, it became necessary for an embedded operating system to support multicore platforms.
+	A embedded operating system having support for such platform enables new research lines, as well as new deployment scenarios, such as the integration of a multicore real time scheduler to manage critical tasks.
+	The EPOS operating system does not have support for a multicore embedded platform, and such support is becoming increasingly necessary.
+	EPOS's operating system design aims on portability, however the software-hardware interface inevitably must be rewritten for each platform.
+	This work aims on describing and documenting how the operating system EPOS was ported to the multicore embedded platform Zedboard.
 }
 \keywords {Operating Systems. Porting. EPOS.}
 

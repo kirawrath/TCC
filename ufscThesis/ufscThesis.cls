@@ -818,63 +818,33 @@
 \begin{center}
     \ABNTlocaldata, \diadata\ de \mesdata\ \anodata.\par
 \end{center}
-%\begin{espacosimples}
-%    \vspace{0.5em}
-%    \begin{center}
-%    {\rule{\ABNTsignwidth}{1pt}\par
-%     \coordenadorname \\ \coordenadortitulo}
-%    \end{center}
-%\end{espacosimples}
+
+\begin{espacosimples}
+    \vspace{0.5em}
+    \begin{center}
+    {\rule{\ABNTsignwidth}{1pt}\par
+     \coordenadorname \\ \coordenadortitulo}
+    \end{center}
+\end{espacosimples}
 
 
  {\setlength{\parindent}{0cm} \bfseries Banca Examinadora:\par}  
 
-\ABNTifnotempty{\ABNTorientadordata}
-    {
-    \ifthenelse{\equal{\orientadorbancadata}{nao}}
-	{
-	\begin{espacosimples}
-	    \vspace{0.5em}
-	    \begin{center}
-	    {\rule{\ABNTsignwidth}{1pt}\par
-	     \bancaformat \ABNTorientadorname \\ \ABNTorientadordata\par}
-	    \end{center}
-	\end{espacosimples}
-	}{}
-    }
       
+ \ABNTifnotempty{\ABNTorientadordata}
+     {
+     \ifthenelse{\equal{\orientadorbancadata}{sim}}
+ 	{
+ 	\begin{espacosimples}
+ 	    \vspace{0.5em}
+ 	    \begin{center}
+ 	    {\rule{\ABNTsignwidth}{1pt}\par
+ 	     \bancaformat \ABNTorientadorname \\ \ABNTorientadordata\par}
+ 	    \end{center}
+ 	\end{espacosimples}
+ 	}{}
+     }
     
-\ABNTifnotempty{\ABNTcoorientadordata}
-    {
-    \ifthenelse{\equal{\coorientadorbancadata}{nao}}
-	{
-	\begin{espacosimples}
-	    \vspace{0.5em}
-	    \begin{center}
-	    {\rule{\ABNTsignwidth}{1pt}\par
-	     \bancaformat \ABNTcoorientadorname \\ \ABNTcoorientadordata\par}
-	    \end{center}
-	\end{espacosimples}
-	}{}
-    }
-
-
-
-
-
-% \ABNTifnotempty{\ABNTorientadordata}
-%     {
-%     \ifthenelse{\equal{\orientadorbancadata}{sim}}
-% 	{
-% 	\begin{espacosimples}
-% 	    \vspace{0.5em}
-% 	    \begin{center}
-% 	    {\rule{\ABNTsignwidth}{1pt}\par
-% 	     \bancaformat \ABNTorientadorname \\ \ABNTorientadordata\par}
-% 	    \end{center}
-% 	\end{espacosimples}
-% 	}{}
-%     }
 \ABNTifnotempty{\ABNTcoorientadordata}
     {
     \ifthenelse{\equal{\coorientadorbancadata}{sim}}
@@ -888,8 +858,9 @@
 	\end{espacosimples}
 	}{}
     }
+
     
-\ifnum \nrobanca < 4
+\ifnum \nrobanca < 5
     {
  \ABNTifnotempty{\bancanameA}
     {
@@ -1005,7 +976,7 @@
 	}
     \vfill
     }
-%\fi
+\fi
 %\if@restonecol\twocolumn \else \newpage \fi
 }% end of \aprovacao
 
@@ -1013,6 +984,8 @@
 % Definicao da página de dedicatória
 \newcommand{\paginadedicatoria}%
 {%
+\ABNTifnotempty{\dedicatoriadata}%
+    {%
 \if@openright		% Garante que se a página for "direita"
     \cleardoublepage	% ele pula uma página para deixar o anverso em branco
 \else
@@ -1026,8 +999,6 @@
 \thispagestyle{empty} 	% Define o estilo desta página como vazio
 \mbox{}
 \vfill
-\ABNTifnotempty{\dedicatoriadata}%
-    {%
     \begin{textorecuadopretextual}
 	{\dedicatoriaformat\dedicatoriadata}\par
     \end{textorecuadopretextual}
@@ -1087,12 +1058,6 @@
 	{\epigrafeformat\epigrafedata}\par
 	{\epigrafeautorformat\epigrafeautordata}\par
     \end{textorecuadopretextual}
-%     \ABNTifnotempty{\epigrafeautordata}%
-% 	{%
-% 	\begin{textorecuadopretextual}
-% 	    {\epigrafeautorformat\epigrafeautordata}\par
-% 	\end{textorecuadopretextual}
-% 	}
     }
      \vspace{1cm}
    

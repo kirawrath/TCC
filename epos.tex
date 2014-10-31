@@ -53,8 +53,28 @@ Interface inflada basicamente é uma interface que declara os métodos de todas 
 
 \section{Modos de Compilação}
 
-\section{Inicialização}
+Para compilar o EPOS, usa-se a ferramenta \verb+make+, através de um conjunto de \verb+makefiles+. As configurações referêntes à compilação podem ser encontradas no arquivo \verb+makedefs+, onde pode-se mudar o \emph{cross compiler} a ser usado, o modo de compilação (que será descrito a seguir), e arquitetura desejada.
 
+%3 types of modes
+
+O EPOS pode ser compilado de três formas diferentes:
+
+\begin{description}
+\item[Library] O sistema é compilado junto com a aplicação, sem distinção de espaço de endereçamento, existência de modo usuário nem chamadas de sistema.
+\item[Builtin] Semelhante ao \emph{library}, com a diferença de que o SO é colocado nos endereços mais altos, e a aplicação nos endereços mais baixos (mas ainda usam o mesmo espaço de endereçamento), em contraste ao \emph{library} que mistura os dois. O principal uso desse modo é para depuração e desenvolvimento\cite{EPOS}.
+\item[Kernel] Existe dois espaços de endereçamento diferentes, com modo usuário e kernel, com uma interface de chamada de sistema entre eles. Existe o conceito de \emph{task}.
+
+\end{description}
+
+%tools
+
+Durante o processo de compilação do EPOS, duas ferramentas próprias são chamadas: \verb=eposcc= e \verb=eposmkbi=. O \verb=eposcc= é uma \emph{script} auxiliar do processo de compilação, é nela em que é diferenciado o modo de compilação do EPOS, e é nele que é acertada a ordem de ligação (\emph{linkage}) dos construtores globais do EPOS, algo muito importante para a inicialização do SO, como é descrito na seção \ref{sec:inicializacao}.
+Já o \verb=eposmkbi= é uma ferramenta cujo objetivo é criar uma imagem ``bootável'' do SO com a aplicação. Esta imagem é uma imagem de virtualização de disco, com as metainformações necessárias já adicionadas à ela \cite{tarcisio}. Estas metainformações são adicionadas também à \verb=struct= \verb+System_info+, para que seja posteriormente usada pelo EPOS durante sua inicialização.
+
+
+
+\section{Inicialização}
+\label{sec:inicializacao}
 O EPOS inicia executando um conjunto de códigos escritos em assembly, chamados de crts.
 No crt, a primeira tarefa feita na inicialização do EPOS é a configuração das pilhas do sistema. Feito isto, o EPOS trata de limpar a seção .bss, para futuro reuso.
 Antes de ser chamado o construtor dos demais objetos globais, a UART e Display são inicializados, assim é possível mais facilmente depurar o código dos construtores.
