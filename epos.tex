@@ -68,7 +68,7 @@ Em seguida, é construído \verb+Init_System+. É neste construtor que todos os 
 \verb+Init_Application+ é responsável por alocar a heap da aplicação, através da requisição de páginas da MMU. \verb+Init_First+ chama o inicializador das \emph{threads}, que então inicializa a \emph{thread} da aplicação e a \emph{idle thread}, que é uma \emph{thread} especial que é executada quando o escalonador não encontra outra \emph{thread} pronta para executar. Em seguida à criação destas \emph{threads}, é chamado \verb+context->load()+ da \emph{thread} da aplicação, fazendo com que o fluxo de execução seja finalmente transferido para a aplicação.
 
 \section{Traits}
-
+\label{sec:traits}
 Existem 4 arquivos traits.h que devem ser levados em consideração em um porte, dois deles devem ser completamente reescritos. Os arquivos \verb+./include/traits.h+ e \verb+/include/system/traits.h+ (onde `.' é a pasta raiz do código) possuem configurações gerais do EPOS, que, a princípio, devem ser independentes de arquitetura. Na prática há alguns pequenos ajustes que devem ser feitos nesses arquivos, pois é lá que se define, por exemplo, se o EPOS trabalhará em um processador \emph{multicore}, se utilizará \emph{scratchpad}, quais componentes estarão em modo de depuração e etc; entretanto isto se resume a trocar o valor de algumas variáveis de \emph{true} para \emph{false} e vice-versa.
 
 Os outros dois arquivos são \verb+./include/mach/zynq/traits.h+ e\\ \verb+./include/arch/armv7/traits.h+. Essa divisão é necessária pois, como dito anteriormente, é possível de um mesmo processador estar em diferentes \emph{machines}, e, caso seja necessário fazer um porte para aquela plataforma, bastaria modificar os arquivos da pasta \emph{mach}, deixando os da pasta \emph{arch} praticamente intactos, o que facilita muito novos portes.
@@ -93,7 +93,7 @@ A sequência de chamadas de função, dado o recebimento de uma interrupção de
 
 
 \section{Gerenciamento de Memória}
-
+\label{sec:gerenciamento}
 Uma das principais funções de um sistema operacional é o gerenciamento de memória. Isto inclui organizar a memória (mapeamento de memória, definição do que cada região da memória guarda, etc) e gerenciamento (manter registro de páginas livres, definir permissões, etc).
 
 % MMU::alloc
@@ -146,7 +146,7 @@ A heap trabalhada com uma lista de memória livre (igual à da MMU), só que ao 
 
 Para que a heap do sistema e a heap do usuário seja corretamente usada, faz-se no EPOS \emph{overload} do operador \verb+new+ e \verb+delete+, e \emph{placement new}. Por exemplo, um \verb+new A()+ chamaria a seguinte sequencia de funções:
 
-\begin{verbatim}
+\begin{lstlisting}
 inline void * operator new(size_t bytes) {
     return malloc(bytes);
 }
@@ -156,25 +156,25 @@ inline void * malloc(size_t bytes) {
     else
         return System::_heap->alloc(bytes);
 }
-\end{verbatim}
+\end{lstlisting}
 
 O compilador se encarrega de avaliar o \verb+sizeof+ de \verb+A+, e envia como parâmetro para o operador \verb+new+. \verb+multiheap+ é um atributo dos traits que define se o sistema possui uma heap de usuário separada da do sistema ou se é usada somente uma única heap.
 
 Para o sistema alocar memória usando sua própria heap com o operador \verb+new+, faz-se um \emph{overload} do \emph{placement new}, como segue:
 
-\begin{verbatim}
+\begin{lstlisting}
 enum System_Allocator {SYSTEM};
 
 inline void * operator new(size_t bytes, const EPOS::System_Allocator & allocator) {
     return EPOS::System::_heap->alloc(bytes);
 }
-\end{verbatim}
+\end{lstlisting}
 
 Feito isto, para alocar, dentro do EPOS, alguma porção de memória utilizando o operador \verb+new+ com a heap do sistema, basta escrever \verb+(SYSTEM)+ logo após o \verb+new+, por exemplo:
 
-\begin{verbatim}
+\begin{lstlisting}
 _timer = new (SYSTEM) Alarm_Timer(handler);
-\end{verbatim}
+\end{lstlisting}
 
 
 \section{Escalonadores}

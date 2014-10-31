@@ -79,7 +79,7 @@ A classe \verb+Zynq_Timer+ possui um atributo estático (e portanto único para 
 
 
 \label{int_handler}
-\begin{verbatim}
+\begin{lstlisting}
 Zynq_Timer * Zynq_Timer::_channels[CHANNELS];
 
 void Zynq_Timer::int_handler(IC::Interrupt_Id id)
@@ -99,7 +99,7 @@ void Zynq_Timer::int_handler(IC::Interrupt_Id id)
     _channels[SCHEDULER]->_handler();
   }
 }
-\end{verbatim}
+\end{lstlisting}
 
 No código, \verb+_current+ guarda o número de ticks atual daquele \emph{timer} (para cada processador), e \verb+_initial+ guarda o número inicial de ticks que foi configurado na inicialização do do escalonador. Note então que a cada interrupção de \emph{timer}, o tratador do alarme será chamado (no caso do primeiro processador), já o do escalonador, somente a cada certo número de ticks ele será chamado (cerca de 100 na implementação).
 
@@ -125,7 +125,7 @@ Precisamos agora definir o \verb+prescaler+. Definimos ele como a razão entre o
 
 \section{Mapeamento de Memória}
 
-Por padrão, as 8 primeiras palavras da memória (ou seja, $8 \times 4 = 32$ bytes) devem possuir instruções específicas. A primeira palavra (memória posição 0) contém a primeira instrução a ser executada, e, nas 7 palavras seguintes, fica a tabela de vetores (\emph{vector table}). Como abaixo da instrução inicial há uma tabela que não se deseja executar no momento de inicialização do sistema, esta primeira instrução necessariamente é um \emph{jump} para uma outra região, para aí então se iniciar o processo de \emph{boot}. 
+Por padrão, as 8 primeiras palavras da memória (ou seja, os primeiros $8 \times 4 = 32$ bytes) devem possuir instruções específicas. A primeira palavra (memória posição 0) contém a primeira instrução a ser executada, e, nas 7 palavras seguintes, fica a tabela de vetores (\emph{vector table}). Como abaixo da instrução inicial há uma tabela que não se deseja executar no momento de inicialização do sistema, esta primeira instrução necessariamente é um \emph{jump} para uma outra região, para aí então se iniciar o processo de \emph{boot}. 
 As demais 7 palavras, pertencentes à tabela de vetores possuem, similarmente, \emph{jumps} para o código onde o tratador da exceção se localiza. A primeira instrução da tabela (posição 0x4) deve conter um \emph{jump} o tratador de uma exceção do tipo undefined instruction, depois, nas próximas palavras, a software interruption, prefectch abort, data abort, reserved, irq e, finalmente, fiq, nesta ordem. Vide seções \ref{sec:interrupt} e \ref{sec:operating_modes} para mais detalhes.
 
 
@@ -133,17 +133,17 @@ As demais 7 palavras, pertencentes à tabela de vetores possuem, similarmente, \
 Desmontando-se o binário da imagem produzida na compilação do EPOS (\emph{dump}), deve-se obter uma saída semelhante a esta exemplificada abaixo em seus primeiros 32 bytes:
 
 \label{dump}
-\hspace*{-1.8cm}\vbox{
+\hspace*{-1cm}\vbox{
 \begin{verbatim}
-	00000000 <_vector_table>:
-		 0:	e59ff7fc 	ldr	pc, [pc, #2044]	; 804 <_start_addr>
-		 4:	e59ff7fc 	ldr	pc, [pc, #2044]	; 808 <_undefined_instruction_addr>
-		 8:	e59ff7fc 	ldr	pc, [pc, #2044]	; 80c <_software_interrupt_addr>
-		 c:	e59ff7fc 	ldr	pc, [pc, #2044]	; 810 <_prefetch_abort_addr>
-		10:	e59ff7fc 	ldr	pc, [pc, #2044]	; 814 <_data_abort_addr>
-		14:	e59ff7fc 	ldr	pc, [pc, #2044]	; 818 <_reserved_addr>
-		18:	e59ff7fc 	ldr	pc, [pc, #2044]	; 81c <_irq_handler_addr>
-		1c:	e59ff7fc 	ldr	pc, [pc, #2044]	; 820 <_fiq_handler_addr>
+00000000 <_vector_table>:
+	 0:  ldr	pc, [pc, #2044]	; 804 <_start_addr>
+	 4:  ldr	pc, [pc, #2044]	; 808 <_undefined_instruction_addr>
+	 8:  ldr	pc, [pc, #2044]	; 80c <_software_interrupt_addr>
+	 c:  ldr	pc, [pc, #2044]	; 810 <_prefetch_abort_addr>
+	10:  ldr	pc, [pc, #2044]	; 814 <_data_abort_addr>
+	14:	 ldr	pc, [pc, #2044]	; 818 <_reserved_addr>
+	18:  ldr	pc, [pc, #2044]	; 81c <_irq_handler_addr>
+	1c:  ldr	pc, [pc, #2044]	; 820 <_fiq_handler_addr>
 \end{verbatim}
 }
 
@@ -156,12 +156,13 @@ Este é o \emph{layout} usado durante o desenvolvimento. Somente as pilhas de us
 		\hline \hline
 		Pilha & Endereço base & Tamanho máximo (bytes)\\[0.5ex]
 		\hline
-		Supervisor		& \verb+0x00100000+ & 983040\\
-		Irq				& \verb+0x00100040+ & 64\\
-		System			& \verb+0x00100080+ & 64\\
-		Abort			& \verb+0x001000c0+ & 64\\
-		Fiq				& \verb+0x00100100+ & 64\\
-		Undefined		& \verb+0x00100140+ & 64\\[1ex]
+		Supervisor (CPU1)		& \verb+0x00080000+ & 500784\\
+		Supervisor (CPU0)		& \verb+0x00100000+ & 524288\\
+		Irq						& \verb+0x00100040+ & 64\\
+		System					& \verb+0x00100080+ & 64\\
+		Abort					& \verb+0x001000c0+ & 64\\
+		Fiq						& \verb+0x00100100+ & 64\\
+		Undefined				& \verb+0x00100140+ & 64\\[1ex]
 		\hline
 	\end{tabular}
 	\caption{Pilhas do sistema com seus tamanhos e posições.}
@@ -170,27 +171,35 @@ Este é o \emph{layout} usado durante o desenvolvimento. Somente as pilhas de us
 
 Lembrando que pilhas, num sistema operacional, tradicionalmente crescem em direção à posições menores da memória, por isto que, por exemplo, a pilha Irq possui 64 bytes, já que $\texttt{0x100040}-\texttt{0x100000} = 40_{16} = 64_{10}$. A pilha do usuário, portanto, localiza-se na última posição da memória (512 MB neste caso) e cresce para ``baixo'' (posições menores de memória) a partir de lá.
 
-%Falar da heap.
-%Memory top/base, app_code, app_data...
+
+A tabela \ref{tab:mem} ilustra o restante do mapeamento de memória feito. APP\_DATA é a posição onde será armazenado a seção de dados do EPOS, sendo que 1KB é seguramente mais do que o suficiente para esta seção. É possível descobrir qual é o tamanho da seção de dados em um binário através do comando \verb+size <binary>+. Com este comando, observou-se que, na atual versão do EPOS, a seção de dados possui 436 bytes, e a .bss 188 bytes.
+
+System Info é uma \verb+struct+ que guarda informações sobre o SO, que é usado durante a inicialização do sistema (e pode ser descartado mais tarde).
+
+Para a MMU, é necessário 3600 KBs para mapear todo o espaço de endereçamento virtual (vide a seção \ref{init_pages} para entender porque apenas 3600 KBs); a tabela e páginas usada pela MMU está indicada como ``Tabela MMU'' na tabela \ref{tab:mem}.
+``Livre'' indica memória não usada. Esta porção não pode ser alocada pois a tabela da MMU precisa iniciar numa posição de memória alinhada à 16 KB.
+
+SYS\_HEAP é a \emph{heap} do sistema operacional. Note que as pilhas das \emph{threads} ficam dentro da \emph{heap} do sistema, por isto ele deve ter um tamanho adequado para poder alocar memória suficiente para o número de \emph{threads} que espera-se executar.
+% APP\_STACK é a pilha da aplicação; note que esta pilha cresce em direção contrária a da \emph{heap}, portanto um excesso de uso da \emph{heap} ou da pilha pode acabar corrompendo a memória da aplicação, gerando um erro que são chamados em alguns sistemas operacionais de \emph{stack overflow}.
 
 
 
-A tabela \ref{tab:mem} ilutra o restante do mapeamento de memória feito. Para a MMU, é necessário pelo menos 4MB para mapear todo o espaço de endereçamento virtual (vide a seção de porte da MMU para mais detalhes). APP\_DATA é para armazenar a seção de dados do EPOS, o que é seguramente mais do que o suficiente. SYS\_HEAP e APP\_HEAP são as \emph{heaps} do sistema operacional e do usuário, respectivamente. APP\_STACK é a pilha da aplicação; note qe esta pilha cresce em direção contrária a da \emph{heap}, portanto um exceço de uso da \emph{heap} ou da pilha pode acabar corrompendo a memória da aplicação, gerando um erro que são chamados em alguns sistemas operacionais de \emph{stack overflow}.
 
 \begin{table}[ht]
 	\centering
 	\begin{tabular}{ccc}
 		\hline \hline
-		Dado & Endereço base & Tamanho máximo\\[0.5ex]
+		Dado & Endereço base & Tamanho Alocado\\[0.5ex]
 		\hline
-		Tabela da MMU	& \verb+0x00100144+ & \~5MB\\
-		APP\_DATA		& \verb+0x00600000+ & 1MB\\
-		SYS\_HEAP		& \verb+0x00700000+ & 32MB\\
-		APP\_HEAP		& \verb+0x02700000+ & 473MB - APP\_STACK\\
-		APP\_STACK		& \verb+0x1ffffffc+ & 473MB - APP\_HEAP\\[1ex]
+		APP\_DATA		& \verb+0x00100140+ & 1KB\\
+		System Info		& \verb+0x00100540+ & 260 bytes\\
+		Livre			& \verb+0x00100644+ & ~14KB\\
+		Tabela MMU		& \verb+0x00104000+ & 3600KB\\
+		SYS\_HEAP		& \verb+0x00488000+ & 128MB\\[1ex]
+%		APP\_STACK		& \verb+0x1ffffffc+ & \~380MB
 		\hline
 	\end{tabular}
-	\caption{Pilhas do sistema com seus tamanhos e posições.}
+	\caption{Mapeamento de memória.}
 	\label{tab:mem}
 \end{table}
 
@@ -278,7 +287,7 @@ Agora que o contexto foi salvo corretamente para ser restaurado, pode-se então 
 
 Agora será discutido como que as interrupções são tratadas individualmente. O corpo do \verb+int_handler+ é bastante curto, então vale a pena escreve-lo aqui:
 
-\begin{verbatim}
+\begin{lstlisting}
 void Zynq_IC::int_handler()
 {	
     unsigned int icciar_value = CPU::in32(IC::GIC_PROC_INTERFACE 
@@ -292,7 +301,7 @@ void Zynq_IC::int_handler()
     _vector[id](id);
     CPU::out32(IC::GIC_PROC_INTERFACE | IC::ICCEOI, icciar_value);
 }
-\end{verbatim}
+\end{lstlisting}
 
 A primeira coisa que o tratador faz e descobrir qual é o número da interrupção que foi gerada, para assim saber como tratar aquela interrupção. Isto é feito lendo-se o registrador ICCIAR (\emph{Interrupt Acknowledge Register}), que provê o número da interrupção e também o processador endereçado.
 É possível que uma interrupção já tenha sido tratada por outro processador, quando isto acontece, o GIC emite uma \emph{Spurious Interruption} para indicar isto. Quando se detecta isto, o tratador não precisa tomar nenhuma outra ação, basta retornar a execução normal.
@@ -323,7 +332,7 @@ Esta tabela é salva na memória principal (RAM) do sistema, e configurar a MMU 
 
 \subsection{Estrutura da Tabela de Tradução de Página}
 
-A TTP possui dois níveis, portanto, desconsiderando-se a TLB, é necessário dois acessos à TTB para traduzir um endereço, caso configurado para páginas de 4 KB. a MMU suporta páginas de 4 KB e 64 KB, assim como seções de 1 MB e 16 MB. Como cada endereço virtual corresponde à exatamente uma entrada na TTP, usar páginas grandes reduz o tamanho da TTP (consequentemente o uso de memória por ela), entretanto usar páginas menores (4 KB) melhoram muito a eficiência da alocação dinâmica de memória e desfragmentação \cite[p.~77]{ug585.1.7}, porém mapear um espaço de 4 GB exigiria milhões de entradas na tabela. Foi justamente para conciliar estes fatores, que decidiu-se por uma tabela de dois níveis, como será melhor ilustrado a seguir.
+A TTP possui dois níveis, portanto, desconsiderando-se a TLB, é necessário dois acessos à TTP para traduzir um endereço, caso configurado para páginas de 4 KB. a MMU suporta páginas de 4 KB e 64 KB, assim como seções de 1 MB e 16 MB. Como cada endereço virtual corresponde à exatamente uma entrada na TTP, usar páginas grandes reduz o tamanho da TTP (consequentemente o uso de memória por ela), entretanto usar páginas menores (4 KB) melhoram muito a eficiência da alocação dinâmica de memória e desfragmentação \cite[p.~77]{ug585.1.7}, porém mapear um espaço de 4 GB exigiria milhões de entradas na tabela. Foi justamente para conciliar estes fatores, que decidiu-se por uma tabela de dois níveis, como será melhor ilustrado a seguir.
 
 A tabela de tradução páginas nível um (TTP1), também chamada de ``\emph{master table}'', divide todo o espaço de endereçamento de 4 GB em 4096 seções de 1 MB, portanto, como cada entrada desta tabela tem o tamanho de uma palavra, seu tamanho total em memória é de $4 \times 4096 = 16$ KB. Os 2 bits menos significativos (lsb) de cada entrada desta tabela, definem que tipo de entrada ela é, que pode ser um dos 5 tipos:
 
@@ -331,7 +340,7 @@ A tabela de tradução páginas nível um (TTP1), também chamada de ``\emph{mas
 	\item Bits lsb 00: É uma ``fault entry'', e gera uma exceção do tipo \emph{prefetch} ou \emph{data abort}, dependendo do tipo de acesso. Este tipo de entrada indica que não há mapeamento virtual para esta região.
 	\item Bits lsb 01: Indica a posição de memória de uma tabela de páginas (nível 2).
 	\item Bits lsb 10 com bit 18 em 0: Aponta para uma seção de 1 MB.
-	\item Bits lsb 10 com bit 18 em 1: Indica uma seção de 16 MB, este tipo de entrada exige 16 posições na TTB1.
+	\item Bits lsb 10 com bit 18 em 1: Indica uma seção de 16 MB, este tipo de entrada exige 16 posições na TTP1.
 	\item Bits lsb 11: Reservado, gera faltas de tradução e não deve ser usado.
 \end{itemize}
 
@@ -357,7 +366,7 @@ Os 4 bits do campo de domínio indicam em qual dos possíveis 16 domínios de me
     \label{fig:translation}
 \end{figure}
 
-A TTP2 possui 256 entradas, cada uma com o tamanho de uma palavra, logo, cada TTP2 precisa de 1 KB de memória. Note que como uma entrada da TTB1 provê 22 bits para endereçar uma TTP2, esta TTP2 pode efetivamente estar localizada em qualquer região da memória, já que 22 bits são suficientes para indexar qualquer região de 1 KB de memória.
+A TTP2 possui 256 entradas, cada uma com o tamanho de uma palavra, logo, cada TTP2 precisa de 1 KB de memória. Note que como uma entrada da TTP1 provê 22 bits para endereçar uma TTP2, esta TTP2 pode efetivamente estar localizada em qualquer região da memória, já que 22 bits são suficientes para indexar qualquer região de 1 KB de memória.
 
 A figura \ref{fig:l2_entry} ilustra como é o formato de uma entrada na TTP2. Os 2 bits menos significativos indicam se a página possui 4 KB, 16 KB ou se a região não está mapeada. Com o endereço de uma entrada da TTP2 em mãos, basta combinar os 20 bits mais significativos desta entrada com os 12 bits menos significativos do endereço virtual, e teremos traduzido o endereço virtual para um físico.
 
@@ -401,7 +410,7 @@ Agora vamos discutir o que cada campo de uma entrada da TTP2 significa.
 
 
 \subsection{Inicializando a Tabela de Páginas}
-
+\label{init_pages}
 Agora que sabemos como as TTPs são estruturadas, bem como o formato de cada entrada dela, podemos finalmente popular esta tabela. Há várias estratégias para fazer isto \cite{mmutheory}, dependendo da forma desejada de mapeamento, por exemplo:
 
 \begin{itemize}
@@ -410,7 +419,38 @@ Agora que sabemos como as TTPs são estruturadas, bem como o formato de cada ent
 	\item Mapeamento 1 para 1: É o mapeamento mais simples possível, de modo que a posição de memória virtual X corresponde a posição de memória física X.
 \end{itemize}
 
-Em um mapeamento 1 para 1, para popular as TTBs, primeiramente, em um loop, itera-se 512 vezes (já que há 512 de RAM), salvando em posições sucessivas de uma determinada região da memória os endereços das TTB2s, levando-se em conta as \emph{flags} acima mencionadas, após as 512 posições, itera-se pelas 3584 posições restantes (4 GB - 512 MB) marcando aquelas regiões como não mapeadas. Feito isto, é necessário também popular cada TTB2 que foi apontada na TTB1, em um processo semelhante. Em um mapeamento por demanda, marca-se as regiões da memória virtual como não mapeadas, com a diferença que, ao invés de apenas abortar o acesso, cria-se dinamicamente aquele mapeamento.
+%Mapeamento adotado:
+
+No mapeamento adodotado, a princípio mapeia-se em em uma relação 1:1 os primeiros 512MB de memória virtual para os 512MB de memória física disponíveis, ou seja, o endereço virtual será o mesmo que o endereço físico. Entretanto note que com o uso de \verb+Chunks+ e \verb+Address_space+ é possível alocar uma porção de memória em um mapeamento próprio, como explicado na seção \ref{sec:gerenciamento}.
+
+Suponha que a MMU esteja ativa, e deseja-se salvar determinada informação numa determinada posição de memória física P, cujo endereço virtual correspondente seja V. Se apontarmos um ponteiro para a posição P, e escrever nesta posição, a MMU automaticamente irá interpretar P como sendo memória virtual, e irá traduzir P para uma outra posição de memória física qualquer e imprevisível.
+
+Agora suponha que o mapeamento de memória esteja dividido no meio, de tal modo que a segunda metade faz uma relação 1:1 com a memória física. Deste modo, dado um endereço físico P, é possível calcular qual é seu endereço virtual V. 
+
+No EPOS foi feito um mapeamento semelhante, o intervalo de memória virtual [0x20000000 : 0x3FFFFFFF] mapeia para [0x0 : 0x1FFFFFFF]. Portanto \verb+P | 0x20000000 == V+, onde | é o operador \emph{or} de bits. Veja o seguinte exemplo de código:
+
+\begin{lstlisting}
+static Log_Addr phy2log(Phy_Addr phy){
+    return phy | PHY_MEM;
+}
+static Phy_Addr calloc(unsigned int frames = 1) {
+    Phy_Addr phy = alloc(frames);
+    memset(phy2log(phy), 0, sizeof(Frame) * frames);
+    return phy;
+}
+\end{lstlisting}
+
+\fig{0.5}{memory_map}{Mapeamento de memória adotado. Os primeiros 512MB de memória virtual são mapeados 1:1 para a memória física, enquanto os 512MB de memória virtual seguintes mapeiam para os os mesmos 512MB de memória física.}
+
+\verb+memset+ irá tentar escrever no endereço enviado como parâmetro, que será interpretado como um endereço virtual, que então será traduzido para um físico correspondente. Entretanto no lugar de um endereço físico, é enviado o endereço lógico no lugar, para que este seja então traduzido para o endereço físico que desejamos. Esta é uma maneira do SO internamente burlar a tradução da MMU.
+
+O restante da memória virtual (1GB-4GB) é traduzido numa relação 1:1. Esta região de memória corresponde principalmente a registradores mapeados em memória, não sendo, portanto, memória RAM. A figura \ref{fig:memory_map} ilustra o mapeamento adotado.
+
+Note que num mapeamento completo 1:1, a TTP1 tomaria $4\times4096$ bytes (4KB), e as 4096 TTP2 (uma para cada posição da TTP1) tomariam $4\times256\times4096$ bytes (4MB). Entretanto como o mapeamento virtual do intervalo 512MB-1GB pode usar as mesmas tabelas TTP2 que foram criadas com o mapeamento do intervalo 0-512MB, pode-se economizar $4\times256\times512$ bytes. Portanto, no total, as tabelas de tradução de páginas usadas pela MMU usam 3600KB de memória RAM.
+
+%Realização deste mapeamento no código:
+
+Em um mapeamento 1 para 1, para popular as TTPs, primeiramente, em um loop, itera-se 512 vezes (já que há 512 de RAM), salvando em posições sucessivas de uma determinada região da memória os endereços das TTP2s, levando-se em conta as \emph{flags} acima mencionadas, após as 512 posições, itera-se pelas por mais 512 posições, mapeando novamente os primeiros 512 MB de memória física. Após isto, mapeia-se as posições restantes em relação 1:1. Feito isto, é necessário também popular cada TTP2 que foi apontada na TTP1, em um processo semelhante. Em um mapeamento por demanda, marca-se as regiões da memória virtual como não mapeadas, com a diferença que, ao invés de apenas abortar o acesso, cria-se dinamicamente aquele mapeamento.
 
 Após feita as tabelas, a MMU está pronta para ser ativada. A MMU é controlada pelo coprocessador CP15, é nele que são guardados os registradores de configuração, endereço base para a TTP, dentre outras funções. Escrevendo-se 1 no bit menos significativo no registrador c1 (SCTLR) deste coprocessador, a MMU é ativada.
 
@@ -446,7 +486,7 @@ Ao se ligar a placa, apenas a CPU0 executa código, e é função dela fazer as 
 
 Isto é suficiente para fazer o segundo processador passar a executar código, entretanto esta é a parte simples, ter dois processadores rodando tem várias implicações sobre como deve ser o \emph{design} de cada componente do sistema, pois agora há a preocupação com coerência e consistência de memória, condições de corrida {\emph{racing conditions}) e etc.
 
-Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, assim como seu\emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como citado na seção anterior.
+Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, assim como ativar seu\emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como citado na seção \ref{sec:mmu}.
 
 
 

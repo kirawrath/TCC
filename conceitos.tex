@@ -5,7 +5,60 @@ Esta seção tem por objetivo o estabelecimento dos conceitos básicos necessár
 
 \section{Traits}
 
-%TODO
+O uso de traits é uma técnica de metaprogramação estática para associar informações aos objetos em tempo de compilação. Por exemplo, uma matriz metaprogramada pode necessitar saber sua dimensão em tempo de compilação. No EPOS, por exemplo, no momento de criação da heap, e de inicialização da MMU, é necessário obter-se informações a respeito do mapeamento de memória do EPOS; estas informações são obtidas através do uso de traits.
+
+Há basicamente 3 maneiras de definirmos traits \cite{generative}:
+
+\begin{description}
+\item[Traits como membro da classe:] Forma mais simples de definir-se um trait. Esta técnica basicamente consiste em criar-se constantes e tipos dentro da própria classe que os usa. Esta tecnica é muitas vezes usadas sem o programador ter sequer conhecimento que está usando traits.
+
+\item[Classes de traits:] Quando um tipo pode ter muitas características, e pode ser conveniente encapsulá-las numa única classe.
+
+\item[Templates de Traits:] Consiste em definir uma classe de templates para gerenciar uma família de tipos. Esta é a técnica usada no EPOS, e será discutida melhor abaixo.
+
+Nesta técnica, cria-se uma classe genérica, para que esta seja especializada por cada tipo que precisar de traits. Por exemplo, podemos fazer uma classe genérica \verb+number+, para associar informações sobre tipos numéricos, e então especializar esta classe para os diferentes tipos, como \verb+int+, \verb+long+, etc:
+
+\begin{lstlisting}
+template<class T>
+class number {
+public:
+	static const bool specialized = false;
+	static const unsigned long max = 0;
+	static const unsigned long min = 0;
+	static const bool sig = false; //Numero com sinal
+};
+template<>
+class number<int> {
+public:
+	static const bool specialized = true;
+	static const unsigned long max = 2147483647;
+	static const long min = -2147483648;
+	static const bool sig = true;
+};
+template<>
+class number<unsigned long> {
+public:
+	static const bool specialized = true;
+	static const unsigned long max = 4294967296;
+	static const long min = 0;
+	static const bool sig = false;
+};
+#include<iostream>
+int main(){
+	//exemplo de uso
+	if(number<int>::specialized)
+		std::cout << number<int>::min << std::endl;
+	else
+		std::cout << "Sem informacoes sobre int\n";
+	
+	return 0;
+}
+\end{lstlisting}
+
+Neste exemplo, poderia-se especializar os demais tipos da linguagem C++, assim como adicionar novos atributos à estas especializações. Note que deste modo é possível centralizar num único arquivo várias características de vários tipos distintos, de forma organizada, de fácil manutenção e edição. No EPOS, os mais diversos componentes do SO podem ser configurados facilmente através dos traits; veja a seção \ref{sec:traits} para mais detalhes.
+
+
+\end{description}
 
 \section{Metaprogramação estática}
 Metaprograma é um program que representa e manipula outros programas ou eles próprios \cite{generative}.
@@ -13,25 +66,24 @@ Com metaprogramação é possível fazer-se loops (através de recursão), e con
 
 A arquitetura do EPOS usa pesadamente de metaprogramação estática para, em tempo de compilação, selecionar a arquitetura, bem como cada componente que será ou não utilizado. Por exemplo, podemos definir um \verb+if+ estático para selecionar de qual classe a classe Chronometer irá derivar. Primeiramente a definição do \verb+if+:
 
-\begin{verbatim}
+\begin{lstlisting}
 template<bool condition, typename Then, typename Else>
 struct IF
 {
     typedef Then Result;
 };
-\end{verbatim}
+\end{lstlisting}
 
 Este template, a princípio, nada mais faz do que tomar 3 parâmetros e então criar um tipo chamado \verb+Result+ igual ao segundo parâmetro, contudo, se fizermos uma especialização deste template, ele passa ser útil:
 
-\hspace*{-1.5cm}\vbox{
-\begin{verbatim}
+\begin{lstlisting}
 template<typename Then, typename Else>
 struct IF<false, Then, Else>
 {
     typedef Else Result;
 };
-\end{verbatim}
-}
+\end{lstlisting}
+
 
 Com esta especialização, toda vez que o primeiro parâmetro resolver-se como falso, \verb+Result+ será definido como o terceiro parâmetro. Temos, portanto, um \verb+if+ metaprogramado funcional, agora voltemos ao exemplo do cronômetro.
 
@@ -39,12 +91,12 @@ Suponha que caso a arquitetura não seja multicore, e nos traits o TSC (\emph{ti
 
 Isto pode ser feito usando nosso \verb+if+ metaprogramado da seguinte forma:
 
-\begin{verbatim}
+\begin{lstlisting}
 class Chronometer: public
 IF<Traits<TSC>::enabled && !Traits<System>::multicore,
 TSC_Chronometer, Alarm_Chronometer>::Result
 {/*class body*/};
-\end{verbatim}
+\end{lstlisting}
 
 Deste modo, \verb+Chronomometer+ derivará de \verb+IF::Result+, que será resolvido como TSC\_Chronometer ou Alarm\_Chronometer. Note que esse exemplo também mostra um uso do Traits, onde para descobrir se o TSC está ativo, bastou ler a constante \verb+Traits<TSC>::enabled+, e, para saber se o sistema é multicore, bastou ler \verb+Traits<System>::multicore+. Todo esse processamento causa zero \emph{overhead} em tempo de execução.
 
@@ -55,7 +107,6 @@ Exemplificando, a UART da Zedboard possui um registrador chamado rcvr\_timeout\_
 \section{Orientação a Objetos}
 Programação orientada a objetos é um método de implementação no qual programas são organizados como coleções cooperantes de objetos, cada qual representa uma instância de alguma classe, sendo que estas classes são todas membros de uma hierarquia de classes unidas por relações de herança \cite{OOAD}.
 
-%TODO
 
 
 \section{Sistema Operacional}
@@ -92,17 +143,17 @@ Um escalonador de processos (ou threads) é responsável por garantir que cada p
 \item \textbf{Vazão (throughput):} Maximizar a quantidade de tarefas realizadas por unidade de tempo.
 \end{enumerate}
 
-Claro que alguns destes itens são contraditórios, por isto a escolha de um algoritmo de escalonamento depende da aplicação e carga de trabalho que o sistema pretende lidar.
+Claro que alguns destes itens são contraditórios entre si, por isto a escolha de um algoritmo de escalonamento depende da aplicação e carga de trabalho que o sistema pretende lidar.
 
 \section{Sistema Embarcado}
 
 É cada vez mais difícil definir o que é um sistema embarcado. Hoje sistemas embarcados estão em todos os lugares, eles acionam motores, freios, cintos de segurança, airbags, sistemas de audio em um carro. Eles encodam digitalmente voz e constroem sinais de radio e enviam eles de um celular para uma estação. Eles controlam microondas, ar-condicionados, semáforos, etc.
 
-Exitem sistemas embarcados dos mais diversos tamanhos e capacidades, desde aqueles com um \emph{clock} de poucos KHz, até processadores com GHz. Nem sequer podemos dizer que um sistema embarcado é ``dedicado'', já que os celulares de hoje em dia, que também são sistemas embarcados, estão cada vez mais próximos de um computador de propósito geral. Podemos dizer o que \emph{não} é um sistema embarcado: Notebooks, desktop, servidores e supercomputadores. É arriscar incorrer em erro tentar dar uma definição mais precisa.
+Exitem sistemas embarcados dos mais diversos tamanhos e capacidades, desde aqueles com um \emph{clock} de poucos KHz, até processadores com GHz. Nem sequer podemos dizer que um sistema embarcado é necessariamente ``dedicado'', já que os celulares de hoje em dia, que também são sistemas embarcados, estão cada vez mais próximos de um computador de propósito geral. Podemos dizer o que \emph{não} é um sistema embarcado: Notebooks, desktop, servidores e supercomputadores. É arriscar incorrer em erro tentar dar uma definição mais precisa.
 
 \section{Sistema de Tempo Real}
 
-Sistemas de tempo real são definidos como aqueles systems nos quais a corretude geral do sistema depende tanto da corretude funcional (produzir o resultado correto) quanto a corretude temporal (produzir o resultado dentro do tempo máximo de tolerância). A corretude temporal é pelo menos tão importante quanto a corretude funcional \cite{realtime}. Ou seja, cada tarefa não somente deve produzir o resultado correto, mas também produzi-lo dentro de um intervalo de tempo predeterminado. Note que nem todos os sistemas de tempo real são sistemas embarcados, apesar de existir uma grande área em comum. Os sistemas de tempo real podem ser classificados em duas categorias:
+Sistemas de tempo real são definidos como aqueles sistemas nos quais a corretude geral do sistema depende tanto da corretude funcional (produzir o resultado correto) quanto a corretude temporal (produzir o resultado dentro do tempo máximo de tolerância). A corretude temporal é pelo menos tão importante quanto a corretude funcional \cite{realtime}. Ou seja, cada tarefa não somente deve produzir o resultado correto, mas também produzi-lo dentro de um intervalo de tempo predeterminado. Note que nem todos os sistemas de tempo real são sistemas embarcados, apesar de existir uma grande área em comum. Os sistemas de tempo real podem ser classificados em duas categorias:
 
 \begin{description}
 	\item[Hard real-time] Nesta categoria, as tarefas do sistemas devem necessariamente ser concluídas dentro do prazo, do contrário a resposta da tarefa já não faz mais sentido, e esta perda de prazo pode causar em uma falha catastrófica do sistema, possivelmente causando grande prejuízo e até mesmo por vidas humanas em risco.
@@ -122,7 +173,7 @@ A princípio, do ponto de vista do processador, uma interrução não tem muita 
 
 
 \section{MMU} %http://epos.lisha.ufsc.br/EPOS+User+Guide#MMU
-A MMU (\emph{Memory Managemed Unit}) é um componente responsável por gerenciar a memória de um sistema. É este componente o responsável por traduzir o endereçamento lógico em endereçamento físico. Uma das principais vantagens de seu uso é a possibilidade de proteção de memória e facilitação da escrita de aplicativos, pois estes não precisam levar em consideração o mapa de memória do SO.
+A MMU (\emph{Memory Managemed Unit}) é um componente responsável por gerenciar a memória de um sistema. É este componente o responsável por traduzir o endereçamento lógico (memória virtual) em endereçamento físico (memória física). Uma das principais vantagens de seu uso é a possibilidade de proteção de memória (intraprocessos e entre processos e SO) e facilitação da escrita de aplicativos, pois estes não precisam levar em consideração o mapa de memória do SO.
 
 \section{UART}
 A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata da saída e entrada serial do sistema, portanto sendo o componente responsável por transmitir e receber caracteres, sendo necessário para impressão em tela, o que pode ser feito tanto por meio de um conector VGA quanto por USB (usado principalmente para depuração do código). As duas principais funções na classe da UART dentro do EPOS são justamente a put e get, para impressão e leitura de caractere, respectivamente. O Zynq possui duas UARTs.
@@ -130,7 +181,7 @@ A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata 
 
 \section{\emph{Timer}}
 
-\emph{Timer} é um componente de hardware que pode ser configurado para contar um certo número de ciclos. Ao términio da contagem o \emph{timer} emite uma interrupção, que então o processador pode tratar. Este componente é fundamental para um escalonador de processos e threads.
+\emph{Timer} é um componente de hardware que pode ser configurado para contar um certo número de ciclos. Ao términio da contagem o \emph{timer} emite uma interrupção, que então o processador pode tratar. Este componente é fundamental para um escalonador de processos e \emph{threads}.
 
 
 \section{Ambiente de Desenvolvimento}
