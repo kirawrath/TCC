@@ -188,14 +188,14 @@ A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata 
 
 %falar do qemu da xilinx
 
-O ambiente de desenvolvimento usado para o porte foi o qemu para ARM (\verb+qemu-system-arm+), para executar o EPOS num ambiente virtualizado (emulado), pois assim pode-se usar ferramentas como o GDB para a depuração do código. O uso do GDB foi fundamental para o desenvolvimento, já que com ele era possível imprimir o valor de cada registrador em um dado ponto da execução, verificar a memória, executar instruções específicas e etc. Para compilar o EPOS foi usado \emph{cross-compilers} para ARM. As flags usadas para criar um ambiente de depuração com o qemu e o GDB foram as sequintes (com cada comando feito em um terminal diferente):
+O ambiente de desenvolvimento usado para o porte foi um qemu para ARM (\verb+qemu-system-arm+) modificado pela Xilinx, para executar o EPOS num ambiente virtualizado (emulado), pois assim pode-se usar ferramentas como o GDB para a depuração do código de forma rápida. O uso do GDB foi fundamental para o desenvolvimento, já que com ele era possível imprimir o valor de cada registrador em um dado ponto da execução, verificar a memória, executar instruções específicas e etc. Para compilar o EPOS foi usado \emph{cross-compilers} para ARM. As flags usadas para criar um ambiente de depuração com o qemu e o GDB foram as sequintes (com cada comando feito em um terminal diferente):
 \hspace*{-1.0cm}\vbox{
 \begin{verbatim}
-qemu-system-arm -no-reboot -nographic -s -S -machine xilinx-zynq-a9\
--cpu cortex-a9 -kernel ./img/zynq_app -fda ./img/zynq_app.img
+./qemu-system-arm -kern-dtb ./xilinx_zynq.dtb -no-reboot -nographic -smp 2 -machine xilinx-zynq-a9 -cpu cortex-a9 -kernel img/panda_app -m 512 -fda img/panda_app.img
 
 arm-none-eabi-gdb -ex "target remote :1234"
 \end{verbatim}
 }
 
 O hardware real também estava disponível, e foi usado quando quando o qemu não produzia resultados confiáveis. Com o hardware real, para a depuração do código foi usado o JTAG.
+Para carregar a imagem do SO na placa, foi usada a ferramenta da Xilinx \verb-xmd-, sendo que esta ferramenta trata de fazer o processador apontar para o ponto de entrada da imagem carregada, de tal modo que é possível conectar o GDB através da porta aberta pelo \verb+xmd+, e então executar através do GDB.

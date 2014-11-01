@@ -2,7 +2,7 @@
 
 %source: http://www.zedboard.org/product/zedboard
 % http://www.zedboard.org/sites/default/files/documentations/ZedBoard_HW_UG_v2_2.pdf
-Zedboard é uma plataforma de desenvolvimento que suporta uma grande variedade de aplicações, visto que ela possui uma boa gama de interfaces e funções para habilitar isto. É dedicada à prototipação e \emph{proof-of-concept}. Em seu interior ela possui um Xilinx Zynq 7000 (Z-7020), que é a arquitetura alvo deste porte. A figura \ref{fig:zed} mostra como é a placa fisicamente.
+Zedboard é uma plataforma de desenvolvimento que suporta uma grande variedade de aplicações, visto que ela possui uma boa gama de interfaces e funções para habilitar isto. É dedicada à prototipação e \emph{proof-of-concept}. Em seu interior ela possui um Xilinx Zynq 7000 (Z-7020), que é a arquitetura alvo deste porte. A figura \ref{fig:zed} mostra como é a placa fisicamente. Zynq 7020 possui um processador \emph{dual core} Cortex A9, cada core possui sua própria MMU e memória cache L1 (instruções e dados) privada.
 
 O ZYNQ-7000 SOC XC7Z020-CLG484-1 conta com o processador Dual ARM Cortex-A9 MPCore. O Zynq possui 4 graduações de velocidade de \emph{clock}, a comercial (graduação -1), industrial (graduação -1 a -2), estendida (-2 a -3) e expandida (-1), sendo a graduação -1 a menor velocidade, e a -3 a maior \cite{product_table}.
 
@@ -20,16 +20,13 @@ A família Zynq 7000 disponibiliza para o desenvolvedor FPGAs, tornando esta pla
     \caption{Zedboard visto de cima.}
 \end{figure}
 
-\section{Arquitetura do Zynq 7000}
-Como já citado, o Zynq 7000 possui um processador \emph{dual core} Cortex A9, cada core possui sua própria MMU e memória cache L1 (instruções e dados) privada.
-
 %layout de memoria
 \section{OCM} O \emph{On-chip Memory} é uma pequena memória de 256KB de RAM que fica próxima ao processador, e portanto tem um acesso mais rápido. O OCM pode ser mapeado nos primeiros 256KB do espaço de endereçamento, ou nos últimos 256KB do espaço de endereçamento \cite{ug585}.
 
 
 \section{Modos de Operação}
 \label{sec:operating_modes}
-A arquitetura ARMv7 conta com 9 modos de operação (7 por padrão, mais 2 com extensões habilidadas), sendo que o único modo não privilegiado é o modo de usuário, os demais modos padrão possuem o mesmo privilégio dentro do sistema\footnote{O modo hipervisor possui certas funções que os demais modos não oferecem, mas no que diz respeito à acesso a memória e execução de instruções, ainda é o mesmo privilégio}. A principal diferença entre um modo e outro é que cada modo conta com um certo subconjunto privado de registradores banqueados, visiveis somente no modo em vigência, como ilustra a imagem \ref{fig:banked}. A tabela \ref{tab:processormode} ilustra quais são os modos de operação disponíveis \cite[p.~1139]{armarm}.
+A arquitetura ARMv7 conta com 9 modos de operação (7 por padrão, mais 2 com extensões habilidadas), sendo que o único modo não privilegiado é o modo de usuário, os demais modos padrão possuem o mesmo privilégio dentro do sistema\footnote{O modo hipervisor possui certas funções que os demais modos não oferecem, mas no que diz respeito à acesso a memória e execução de instruções, ainda é o mesmo nível de privilégio.}. A principal diferença entre um modo e outro é que cada modo conta com um certo subconjunto privado de registradores banqueados, visiveis somente no modo em vigência, como ilustra a imagem \ref{fig:banked}. A tabela \ref{tab:processormode} ilustra quais são os modos de operação disponíveis \cite[p.~1139]{armarm}.
 O campo ``Codificação'' é usado no registrador CPSR para se verificar ou modificar o modo de operação vigente.
 
 \begin{table}[ht]
@@ -54,16 +51,16 @@ System & 11111 & Sempre\\[1ex]
 \label{tab:processormode} % is used to refer this table in the text
 \end{table}
 
-\textbf{Modo Usuário:} Modo não-privilegiado de execução. Neste modo somente é possível de se fazer acesso não privilegiado aos recursos do hardware (não prodendo acessar as áreas protegidas). Não é possível de se mudar para outro modo de operação quando neste, a não ser por eventos externos como interrupções.
+\textbf{Modo Usuário:} Modo não-privilegiado de execução. Neste modo somente é possível de se fazer acesso não privilegiado aos recursos do hardware (não podendo acessar as áreas protegidas). Não é possível de se mudar para outro modo de operação quando neste, a não ser por eventos externos como interrupções.
 
-\textbf{Modo Sistema:} Modo privilegiado de execução. Este modo usa os mesmos registradores que o modo usuário e nenhuma exceção leva a este modo. Somente é possível de se entrar nesse modo alterando os bits do registrador de status do sistema (CPSR); é necessário já estar em algum modo privilegiado para tal operação.
+\textbf{Modo Sistema:} Modo privilegiado de execução. Este modo usa os mesmos registradores que o modo usuário e nenhuma exceção leva a este modo. Somente é possível de entrar nesse modo alterando os bits do registrador de status do sistema (CPSR); é necessário já estar em algum modo privilegiado para tal operação.
 
 \textbf{Modo Supervisor:} É o modo padrão para no qual processador entra quando uma exceção do tipo \emph{Supervisor Call} é recebida.
 Para gerar um \emph{Supervisor Call}, usa-se a instrução \verb+svc+. O processador entra neste modo ao se resetar.
 
 \textbf{Modo Abort:} Modo que o processador entra quando recebe uma interrupção do tipo \emph{prefetch abort} ou \emph{data abort}.
 
-\textbf{Modo Indefinido:} Modo que o processador entra quando se tenta executar uma instrução não definida.
+\textbf{Modo Indefinido:} Modo que o processador entra quando se tenta executar uma instrução não definida ou mal formada.
 
 \textbf{Modo FIQ:} Modo que o processador entra quando recebe uma interrupção FIQ.
 
@@ -163,7 +160,7 @@ Por exemplo, no modo \textbf{6}:2:1, o CPU\_\textbf{6x}4x multiplica o CPU\_1x 6
 	\centering
 	\begin{tabular}{ccc}
 		\hline\hline
-		Nomenclatura & \emph{Clock Ratio Mode} & Máxima frequência da CPU\\[0.5ex]
+		\emph{Clock} & \emph{Clock Ratio Mode} & Máxima frequência da CPU\\[0.5ex]
 		\hline
 		CPU\_6x4x & \multirow{4}{*}{6:3:2:1} & 667 MHZ\\
 		CPU\_3x2x &                          & 333 MHZ\\
@@ -180,24 +177,10 @@ Por exemplo, no modo \textbf{6}:2:1, o CPU\_\textbf{6x}4x multiplica o CPU\_1x 6
 	\label{tab:clocks}
 \end{table}
 
-%\begin{figure}[ht!]
-%    \centering
-%    \includegraphics[width=8cm]{figuras/zedboard}
-%	\caption{Arquitetura do Zynq 7000.}
-%\end{figure}
 
 
+%Faltou seção para a MMU e UART... Está bem explicado do capítulo do porte,
+%mas seria coerente colocar alguma coisa aqui também...
 
-
-
-
-
-%Falar que a MMU tem dois níveis, tamanho dela, etc...
-
-
-
-%%%%%%%%
-%		Get image from ug585 v1.7 p.79!
-%%%%%%%%
 
 

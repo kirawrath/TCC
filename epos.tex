@@ -25,7 +25,7 @@ Como o objetivo é criar um ambiente em que o desenvolvedor possa rapidamente pr
 
 \textbf{Linguagem e paradigma:} O EPOS é escrito em C++, e não em C, como é tradicionalmente feito. Como paradigma, é usado orientação à objetos, então cada componente do EPOS está encapsulado por uma classe (como a heap, timer, thread, etc). No EPOS também é muito usado conceitos como herança e metaprogramação estática (que será abordado mais a frente).
 
-\textbf{Mediadores de Hardware:} Dentro da arquitetura do EPOS há o conceito de mediadores de hardware, que são os componentes (ou classes) dependentes de plataforma. Idealmente, as únicas classes que precisam ser modificadas e/ou reimplementadas são os mediadores. Há mediadores específicos da placa, como por exemplo Pandaboard, Zedboard e etc; abstraídos sob o nome de \emph{machine} e mediadores específicos de um processador, abstraídos sob o nome de \emph{architecture}. No código do EPOS, estes mediadores encontram-se nas pastas \emph{mach} e \emph{arch}.
+\textbf{Mediadores de Hardware:} Dentro da arquitetura do EPOS há o conceito de mediadores de hardware, que são os componentes (ou classes) dependentes de plataforma. Idealmente, as únicas classes que precisam ser modificadas e/ou reimplementadas são os mediadores. Há mediadores específicos da placa, como para a Pandaboard, a Zedboard e etc; abstraídos sob o nome de \emph{machine} e mediadores específicos de um processador, abstraídos sob o nome de \emph{architecture}. No código do EPOS, estes mediadores encontram-se nas pastas \emph{mach} e \emph{arch}.
 % Fonte: Hardware Mediators: A Portability Artifact for Component-based Systems
 % HAL vs Virtualização vs Mediadores
 
@@ -53,7 +53,7 @@ Interface inflada basicamente é uma interface que declara os métodos de todas 
 
 \section{Modos de Compilação}
 
-Para compilar o EPOS, usa-se a ferramenta \verb+make+, através de um conjunto de \verb+makefiles+. As configurações referêntes à compilação podem ser encontradas no arquivo \verb+makedefs+, onde pode-se mudar o \emph{cross compiler} a ser usado, o modo de compilação (que será descrito a seguir), e arquitetura desejada.
+Para compilar o EPOS, usa-se a ferramenta \verb+make+, através de um conjunto de \verb+makefiles+. As configurações referentes à compilação podem ser encontradas no arquivo \verb+makedefs+, onde pode-se mudar o \emph{cross compiler} a ser usado, o modo de compilação (que será descrito a seguir), arquitetura desejada e etc.
 
 %3 types of modes
 
@@ -61,15 +61,15 @@ O EPOS pode ser compilado de três formas diferentes:
 
 \begin{description}
 \item[Library] O sistema é compilado junto com a aplicação, sem distinção de espaço de endereçamento, existência de modo usuário nem chamadas de sistema.
-\item[Builtin] Semelhante ao \emph{library}, com a diferença de que o SO é colocado nos endereços mais altos, e a aplicação nos endereços mais baixos (mas ainda usam o mesmo espaço de endereçamento), em contraste ao \emph{library} que mistura os dois. O principal uso desse modo é para depuração e desenvolvimento\cite{EPOS}.
+\item[Builtin] Semelhante ao \emph{library}, com a diferença de que o SO é colocado nos endereços mais altos, e a aplicação nos endereços mais baixos (ambos ainda usam o mesmo espaço de endereçamento), em contraste ao \emph{library} que mistura os dois. O principal uso desse modo é para depuração e desenvolvimento \cite{EPOS}.
 \item[Kernel] Existe dois espaços de endereçamento diferentes, com modo usuário e kernel, com uma interface de chamada de sistema entre eles. Existe o conceito de \emph{task}.
 
 \end{description}
 
 %tools
 
-Durante o processo de compilação do EPOS, duas ferramentas próprias são chamadas: \verb=eposcc= e \verb=eposmkbi=. O \verb=eposcc= é uma \emph{script} auxiliar do processo de compilação, é nela em que é diferenciado o modo de compilação do EPOS, e é nele que é acertada a ordem de ligação (\emph{linkage}) dos construtores globais do EPOS, algo muito importante para a inicialização do SO, como é descrito na seção \ref{sec:inicializacao}.
-Já o \verb=eposmkbi= é uma ferramenta cujo objetivo é criar uma imagem ``bootável'' do SO com a aplicação. Esta imagem é uma imagem de virtualização de disco, com as metainformações necessárias já adicionadas à ela \cite{tarcisio}. Estas metainformações são adicionadas também à \verb=struct= \verb+System_info+, para que seja posteriormente usada pelo EPOS durante sua inicialização.
+Durante o processo de compilação do EPOS, duas ferramentas próprias são chamadas: \verb=eposcc= e \verb=eposmkbi=. O \verb=eposcc= é um \emph{script} auxiliar do processo de compilação, é nele em que é diferenciado o modo de compilação do EPOS, e é nele que é acertada a ordem de ligação (\emph{linkage}) dos construtores globais do EPOS, algo muito importante para a inicialização do SO, como é descrito na seção \ref{sec:inicializacao}.
+Já o \verb=eposmkbi= é uma ferramenta cujo objetivo é criar uma imagem ``bootável'' do SO com a aplicação. Esta imagem é uma imagem de virtualização de disco, com as metainformações necessárias já adicionadas a ela \cite{tarcisio}. Estas metainformações são adicionadas também à \verb=struct= \verb+System_info+, para que seja posteriormente usada pelo EPOS durante sua inicialização.
 
 
 
@@ -89,26 +89,26 @@ Em seguida, é construído \verb+Init_System+. É neste construtor que todos os 
 
 \section{Traits}
 \label{sec:traits}
-Existem 4 arquivos traits.h que devem ser levados em consideração em um porte, dois deles devem ser completamente reescritos. Os arquivos \verb+./include/traits.h+ e \verb+/include/system/traits.h+ (onde `.' é a pasta raiz do código) possuem configurações gerais do EPOS, que, a princípio, devem ser independentes de arquitetura. Na prática há alguns pequenos ajustes que devem ser feitos nesses arquivos, pois é lá que se define, por exemplo, se o EPOS trabalhará em um processador \emph{multicore}, se utilizará \emph{scratchpad}, quais componentes estarão em modo de depuração e etc; entretanto isto se resume a trocar o valor de algumas variáveis de \emph{true} para \emph{false} e vice-versa.
+Existem 4 arquivos \verb=traits.h= que devem ser levados em consideração em um porte, dois deles devem ser completamente reescritos. Os arquivos \verb+./include/traits.h+ e \verb+/include/system/traits.h+ (onde `.' é a pasta raiz do código) possuem configurações gerais do EPOS, que, a princípio, devem ser independentes de arquitetura. Na prática há alguns pequenos ajustes que devem ser feitos nesses arquivos, pois é lá que se define, por exemplo, se o EPOS trabalhará em um processador \emph{multicore}, se utilizará \emph{scratchpad}, quais componentes estarão em modo de depuração e etc; entretanto isto se resume a trocar o valor de algumas variáveis de \emph{true} para \emph{false} e vice-versa.
 
-Os outros dois arquivos são \verb+./include/mach/zynq/traits.h+ e\\ \verb+./include/arch/armv7/traits.h+. Essa divisão é necessária pois, como dito anteriormente, é possível de um mesmo processador estar em diferentes \emph{machines}, e, caso seja necessário fazer um porte para aquela plataforma, bastaria modificar os arquivos da pasta \emph{mach}, deixando os da pasta \emph{arch} praticamente intactos, o que facilita muito novos portes.
+Os outros dois arquivos são \verb+./include/mach/zynq/traits.h+ e\\ \verb+./include/arch/armv7/traits.h+. Essa divisão é necessária pois, como dito anteriormente, é possível de um mesmo processador estar em diferentes \emph{machines}, e, caso seja necessário fazer um porte para aquela plataforma, bastaria modificar os arquivos da pasta \emph{mach}, deixando os da pasta \emph{arch} praticamente intactos, o que facilita novos portes.
 
 O arquivo \verb+./include/arch/armv7/traits.h+ trata das opções específicas do processador, portanto é lá que opções como \emph{endianess}, velocidade de \emph{clock}, número de \emph{cores}, tamanho da \emph{heap} e \emph{stacks}, bem como outras opções pertinentes ao mapeamento de memória e opções da MMU podem ser configuradas.
 
-No arquivo de traits da \emph{machine}, ficam as opções de configuração de componentes como a UART, controlador de interrupções, \emph{timer}, e qualquer componente de interfaceamento externo à placa (rede, por exemplo). Componentes podem ser facilmente ativados ou desativados nestas opções.
+No arquivo de \verb=traits= da \emph{machine}, ficam as opções de configuração de componentes como a UART, controlador de interrupções, \emph{timer}, e qualquer componente de interfaceamento externo à placa (rede, por exemplo). Componentes podem ser facilmente ativados ou desativados nestas opções.
 
 \section{Interrupções}
 
 
-Como o EPOS foca do desempenho da aplicação, em seu design opta-se por utilizar a menor quantidade possível de interrupções, e evitá-las sempre que possível, isto contribui também para que o sistema seja mais previsível. Se a aplicação não precisar de componentes específicos que necessitem interrupções (como um rádio, por exemplo), a única interrupção a ser tratada será a do \emph{timer}, já que o escalonador e alarm necessitam dele.
+Como o EPOS foca no desempenho da aplicação, em seu design opta-se por utilizar a menor quantidade possível de interrupções, e evitá-las sempre que possível, isto contribui também para que o sistema seja mais previsível. Se a aplicação não precisar de componentes específicos que necessitem interrupções (como um rádio, por exemplo), a única interrupção a ser tratada será a do \emph{timer}, já que o escalonador e alarm necessitam dele.
 
 %interrupções (indexação de um vetor de interrupções pelo seu ID)
 %exception -> ic_handler -> timer_handler -> alarm handler
 %                                         -> scheduelr handler
 
-A sequência de chamadas de função, dado o recebimento de uma interrupção de \emph{timer} está ilutrada na figura \ref{fig:exception_handling}. Exception é um código em assembly cujo objetivo é salvar o contexto no recebimento da chamada, chamar o tratador de interrupções padrão, e restaurar o contexto após isto. O tratador de interrupções do \emph{interrupt controller} (IC) possui um vetor de tratadores de interrupção, onde para cada número de interrupção, há uma entrada correspondente no vetor. Este tratador então lê o registrador responsável por armazenar o número da interrupção gerada (esta parte é dependente de arquitetura, na Zedboard uma interrupção de timer tem número 29, por exemplo), indexa seu vetor e chama o tratador apropriado. Chegando no tratador do \emph{timer}, este chama os tratadores de todos os componentes que dependem de um \emph{timer}, neste caso o \verb+Alarm+ e \verb+Scheduler+.
+A sequência de chamadas de função, dado o recebimento de uma interrupção de \emph{timer} está ilustrada na figura \ref{fig:exception_handling}. Exception é um código em assembly cujo objetivo é salvar o contexto no recebimento da chamada, chamar o tratador de interrupções padrão, e restaurar o contexto após isto. O tratador de interrupções do \emph{interrupt controller} (IC) possui um vetor de tratadores de interrupção, onde para cada número de interrupção, há uma entrada correspondente no vetor. Este tratador então lê o registrador responsável por armazenar o número da interrupção gerada (esta parte é dependente de arquitetura, na Zedboard uma interrupção de timer tem número 29, por exemplo), indexa seu vetor e chama o tratador apropriado. Chegando no tratador do \emph{timer}, este chama os tratadores de todos os componentes que dependem de um \emph{timer}, neste caso o \verb+Alarm+ e \verb+Scheduler+.
 
-\fig{0.18}{exception_handling}{Sequência de chamada de tratadores de interrupção. A interrupção gerada neste exemplo foi uma de \emph{timer}}. 
+\fig{0.20}{exception_handling}{Sequência de chamada de tratadores de interrupção. A interrupção gerada neste exemplo foi uma de \emph{timer}.}. 
 
 
 
@@ -118,10 +118,10 @@ Uma das principais funções de um sistema operacional é o gerenciamento de mem
 
 % MMU::alloc
 
-Para entendermos como isto é feito, primeiro é necessário entendermos como funciona a abstração da MMU no EPOS. Isto se dá com 4 classes principais, a \verb+ARMv7_MMU+, que possui a lista de memória livre, a \verb+Page_Table+, que mapeia porções de até 1MB de endereço virtual para físico, \verb+Chunk+, que nada mais é que um conjunto de \verb+Page_Tables+, e, finalmente, \verb+Directory+, que é um conjunto de \verb+Chunks+ (ou \verb+Page_Tables+).
+Para entendermos como isto é feito, primeiro é necessário entendermos como funciona a abstração da MMU no EPOS. Isto se dá com 4 classes principais, a \verb+ARMv7_MMU+, que possui a lista de memórias livres, a \verb+Page_Table+, que mapeia porções de até 1MB de endereço virtual para físico, \verb+Chunk+, que nada mais é que um conjunto de \verb+Page_Tables+, e, finalmente, \verb+Directory+, que é um conjunto de \verb+Chunks+ (ou \verb+Page_Tables+).
 
-A classe \verb+ARMv7_MMU+ possui uma uma lista de porções de memória livre, gerenciadas pelas funções \verb+alloc+ e \verb+free+. A granularidade destas porções de memória é a de um \emph{frames}
-\footnote{Frame é uma porção de tamanho fixo de memória física (normalmente 4KB). A diferença entre uma página e um frame é que um frame referece à uma porção da memória física, enquanto uma página referece à uma porção de memória virtual.}.
+A classe \verb+ARMv7_MMU+ possui uma uma lista de porções de memórias livres, gerenciadas pelas funções \verb+alloc+ e \verb+free+. A granularidade destas porções de memória é a de \emph{frames}
+\footnote{Frame é uma porção de tamanho fixo de memória física (normalmente 4KB). A diferença entre uma página e um frame é que um frame refere-se à uma porção da memória física, enquanto uma página refere-se à uma porção de memória virtual.}.
 Note que esta lista utiliza os endereços \textbf{físicos} destas porções de memória.
 
 A tabela de páginas da MMU do ARMv7, assim como a do IA32, possui dois níveis. Na nomenclatura da ARM, a tabela de nível mais alto é a tabela L1 (de \emph{level}), onde cada entrada desta tabela aponta para outra tabela (uma tabela L2).
@@ -130,19 +130,21 @@ Cada entrada da tabela L2 possui o endereço físico correspondente ao endereço
 Nas abstrações do EPOS, a classe que gerencia a tabela L2 é a \verb+Page_Table+, e a classe que gerencia a tabela L1 é a \verb+Directory+. Portanto uma \verb+Page_Table+ é apenas um vetor, onde em cada posição está escrita uma posição de memória física, junto de algumas \emph{flags} (que definem permissões, ``cacheabilidade'' e etc). O número máximo de entradas numa \verb+Page_Table+ é dependente de arquitetura. No ARMv7 são 256 entradas de 4 bytes (mapeando até 1MB de memória portanto), e no IA32 são 1024 entradas (que mapeiam até 4MB).
 
 \verb+Chunk+ é uma classe bastante importante, e, apesar de simples, é importante que se tenha um bom entendimento sobre como ela funciona.
-Cria-se um chunk para alocar uma certa porção de memória, em um espaço de endereçamento próprio. 
+Cria-se um \verb+chunk+ para alocar uma certa porção de memória, em um espaço de endereçamento próprio. 
 
-Esta classe recebe dois parâmetros: A quantidade de bytes a serem alocados, e as \emph{flags} a serem usadas. \verb+Chunk+ então calcula quantas tabelas de páginas serão necessárias para mapear a quantidade de bytes requisitada, e então cria estas páginas contiguamente (em qualquer lugar da memória, a ser decidido pela função \verb+alloc+).
+Esta classe recebe dois parâmetros: A quantidade de bytes a serem alocados, e as \emph{flags} a serem usadas. \verb+Chunk+ então calcula quantas tabelas de páginas serão necessárias para mapear a quantidade de bytes requisitada, e então cria estas páginas contiguamente no espaço de endereçamento virtual (em qualquer lugar da memória, a ser decidido pela função \verb+alloc+).
 
 \verb+Chunk+ então chama a função \verb+map+ de \verb+Page_Table+ para mapear aquela porção da memória. Cada \emph{frame} é requisitado pela função \verb+alloc+, o que significa que cada \verb+Page_Table+ pode estar apontando para qualquer posição da memória, não estando os \emph{frames} necessariamente contiguos na memória física, apesar que eles serão \textbf{contíguos} no espaço de memória virtual mapeada num mesmo \verb+Chunk+.
 
-Portanto esta classe efetivamente aloca uma porção de memória em um espaço de endereçamento próprio, este fato será bastante importante quando discutirmos a criação das heaps de usuário e do sistema.
+Portanto esta classe efetivamente aloca uma porção de memória em um espaço de endereçamento próprio, este fato será bastante importante quando discutirmos a criação das \emph{heaps} de usuário e do sistema.
 
 %Directory
 
-Já a classe directory é responsável por gerenciar e unificar todas estas porções de memória. Sua principal função é a \verb+attach+, que tomando como parâmetro um \verb+Chunk+, mapeia cada uma de suas páginas contiguamente (isto é, cria uma entrada em directory que a aponta para uma página criada em \verb+Chunk+, para cada página).
+Já a classe directory é responsável por gerenciar e unificar todas estas porções de memória. Sua principal função é a \verb+attach+, que tomando como parâmetro um \verb+Chunk+, mapeia cada uma de suas páginas contiguamente (isto é, cria uma entrada em \verb=directory= que aponta para uma página criada em \verb+Chunk+, para cada página dele).
 
-A figura \ref{fig:mmu_translation} ilustra a interação entre os conteúdos das entradas de \verb+Directory+ e \verb+Page_Table+ com a memória física. A quantidade de bits usada para indexar as tabelas é dependente de arquitetura. Aqui, os primeiros 12 bits indexam a tabela de \verb+Directory+, os 8 bits seguintes indexam a tabela de \verb+Page_Table+, e os últimos 12 bits são simplesmente copiados do endereço virtual para o físico. Mais detalhes sobre este processo na seção \ref{sec:mmu}, em particular na imagem \ref{fig:translation}.
+A figura \ref{fig:mmu_translation} ilustra a interação entre os conteúdos das entradas de \verb+Directory+ e \verb+Page_Table+ com a memória física. A quantidade de bits usada para indexar as tabelas é dependente de arquitetura. Aqui, os primeiros 12 bits indexam a tabela de \verb+Directory+, os 8 bits seguintes indexam a tabela de \verb+Page_Table+, e os últimos 12 bits são simplesmente copiados do endereço virtual para o físico.
+Portanto, no exemplo, do endereço 0xAB2FF123, o número 0xAB2 será usado para indexar a tabela de nível 1 (\verb=Directory=), o número 0xFF indexará a tabela de segundo nível (\verb+Page_Table+), onde estará escrito o endereço físico correspondente àquele endereço virtual.
+Mais detalhes sobre este processo na seção \ref{sec:mmu}, em particular na imagem \ref{fig:translation}.
 
 %\fig{0.42}{mmu_translation}{Interação entre \verb+Directory+ e \verb+Page_Table+ com a memória física.}
 
@@ -158,13 +160,13 @@ A figura \ref{fig:mmu_translation} ilustra a interação entre os conteúdos das
 
 \subsection{Heaps}
 
-A heap é responsável por armazenar e gerenciar os dados dinâmicos criados durante a execução da aplicação (a cada \verb+malloc/new+ executado, por exemplo). Existe duas heaps: A do sistema, e a do usuário. É possível compilar o EPOS com apenas a heap do sistema, quando o desenvolvedor decide que a aplicação deverá rodar em modo privilegiado, não sendo usado portanto o modo usuário (isto é configurável nos \verb+traits+).
+A \emph{heap} é responsável por armazenar e gerenciar os dados dinâmicos criados durante a execução da aplicação e do SO (a cada \verb+malloc/new+ executado, por exemplo). Existem duas heaps: A do sistema, e a do usuário. É possível compilar o EPOS com apenas a \emph{heap} do sistema, quando o desenvolvedor decide que a aplicação deverá rodar em modo privilegiado, não sendo usado portanto o modo usuário (isto é configurável nos \verb+traits+).
 
-A memória da heap é alocada através de um \verb+Chunk+. É neste ponto que pode-se atribuir flags que limitam as permições de acesso (a heap de usuário é alocada sem restrições de acesso, já a do sistema aloca uma porção de memória que só pode ser acessada em modo privilegiado). É por usar um \verb+Chunk+ também que do ponto de vista da aplicação, é como se ela tivesse acesso à todo o espaço de memória. Note que do ponto de vista da MMU (e sua lista de memória livre), é como se a porção de memória da heap estivesse em uso, já a heap vê sua porção de memória como livre.
+A memória da \emph{heap} é alocada através de um \verb+Chunk+. É neste ponto que pode-se atribuir \emph{flags} que limitam as permições de acesso (a \emph{heap} de usuário é alocada sem restrições de acesso, já a do sistema aloca uma porção de memória que só pode ser acessada em modo privilegiado). É por usar um \verb+Chunk+ também que do ponto de vista da aplicação, é como se ela tivesse acesso à todo o espaço de memória. Note que do ponto de vista da MMU (e sua lista de memórias livres), é como se a porção de memória da heap estivesse em uso, já a heap vê sua porção de memória como livre.
 
-A heap trabalhada com uma lista de memória livre (igual à da MMU), só que ao contrário da MMU, que aloca somente páginas (frames) inteiras de memória, a heap aloca quantidades de memória com a granularidade de bytes.
+A heap trabalha com uma lista de memórias livres (igual à da MMU), só que ao contrário da MMU, que aloca somente páginas (frames) inteiros de memória, a heap aloca quantidades de memória com a granularidade de bytes.
 
-Para que a heap do sistema e a heap do usuário seja corretamente usada, faz-se no EPOS \emph{overload} do operador \verb+new+ e \verb+delete+, e \emph{placement new}. Por exemplo, um \verb+new A()+ chamaria a seguinte sequencia de funções:
+Para que a \emph{heap} do sistema e a \emph{heap} do usuário seja corretamente usada, faz-se no EPOS \emph{overload} do operador \verb+new+ e \verb+delete+, e \emph{placement new}. Por exemplo, um \verb+new A()+ chamaria as seguintes funções:
 
 \begin{lstlisting}
 inline void * operator new(size_t bytes) {
@@ -178,9 +180,9 @@ inline void * malloc(size_t bytes) {
 }
 \end{lstlisting}
 
-O compilador se encarrega de avaliar o \verb+sizeof+ de \verb+A+, e envia como parâmetro para o operador \verb+new+. \verb+multiheap+ é um atributo dos traits que define se o sistema possui uma heap de usuário separada da do sistema ou se é usada somente uma única heap.
+O compilador se encarrega de avaliar o \verb+sizeof+ de \verb+A+, e envia como parâmetro para o operador \verb+new+. \verb+multiheap+ é um atributo dos \verb+traits+ que define se o sistema possui uma \emph{heap} de usuário separada da \emph{heap} do sistema ou se é usada somente uma única \emph{heap}.
 
-Para o sistema alocar memória usando sua própria heap com o operador \verb+new+, faz-se um \emph{overload} do \emph{placement new}, como segue:
+Para o sistema alocar memória usando sua própria \emph{heap} com o operador \verb+new+, faz-se um \emph{overload} do \emph{placement new}, como segue:
 
 \begin{lstlisting}
 enum System_Allocator {SYSTEM};
@@ -190,7 +192,7 @@ inline void * operator new(size_t bytes, const EPOS::System_Allocator & allocato
 }
 \end{lstlisting}
 
-Feito isto, para alocar, dentro do EPOS, alguma porção de memória utilizando o operador \verb+new+ com a heap do sistema, basta escrever \verb+(SYSTEM)+ logo após o \verb+new+, por exemplo:
+Feito isto, para alocar, dentro do EPOS, alguma porção de memória utilizando o operador \verb+new+ com a \emph{heap} do sistema, basta escrever \verb+(SYSTEM)+ logo após o \verb+new+, por exemplo:
 
 \begin{lstlisting}
 _timer = new (SYSTEM) Alarm_Timer(handler);
@@ -215,7 +217,7 @@ A figura \ref{fig:edf_uml} ilustra a relação entre as classes dos escalonadore
 
 \item[PEDF:] O \emph{partitioned} EDF (particionado) possui uma fila de tarefas a serem escalonadas para cada processador. A escolha de que fila cada tarefa é atribuida é feita de forma estática. Cada tarefa executa sempre no mesmo processador, não havendo migração destas. 
 
-\item[GEDF:] O EDF global utiliza uma única fila de tarefas, e atribui uma tarefa toda vez que um processador fica livre. A vantagem deste escalonador sobre o PEDF é que ele consegue escalonar conjuntos de tarefas que o PDF não conseguiria, entretanto seu desempenho costuma ser menor e menos previsível, pois migrar uma tarefa de um processador para o outro é custoso, e gera um mal aproveitamento das memórias \emph{cache}.
+\item[GEDF:] O EDF global utiliza uma única fila de tarefas, e atribui uma tarefa toda vez que um processador fica livre. A vantagem deste escalonador sobre o PEDF é que ele consegue escalonar conjuntos de tarefas que o PEDF não conseguiria, entretanto seu desempenho costuma ser menor e menos previsível, pois migrar uma tarefa de um processador para o outro é custoso, e gera um mal aproveitamento das memórias \emph{cache}.
 
 \item[CEDF:] Este é o caso geral do PEDF e GEDF. Neste escalonador há uma fila para cada grupo de processadores (\emph{cluster}). Por exemplo, numa arquitetura que usa 8 processadores, poder-se-ia fazer 4 grupos de 2 processadores cada, totalizando 4 filas. Somente há migração de tarefas entre processadores de um mesmo grupo. Caso o grupo seja do tamanho do número de cores, tem-se o GEDF, e se cada grupo tiver apenas um processador, obtem-se o PEDF.
 
