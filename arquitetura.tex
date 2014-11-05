@@ -33,7 +33,7 @@ O campo ``Codificação'' é usado no registrador CPSR para se verificar ou modi
 \centering
 \begin{tabular}{ccc}
 \hline\hline                        %inserts double horizontal lines
-Modo do processador  & Codificação & Implementado?\\ [0.5ex] % inserts table 
+Modo do processador  & Codificação & Implementado?\\ [0.5ex]
 %heading
 \hline                  % inserts single horizontal line
 User & 10000 & Sempre \\
@@ -48,7 +48,7 @@ System & 11111 & Sempre\\[1ex]
 \hline %inserts single line
 \end{tabular}
 \caption{Modos do processador. Codificação corresponde aos bits CPSR[4:0].}
-\label{tab:processormode} % is used to refer this table in the text
+\label{tab:processormode}
 \end{table}
 
 \textbf{Modo Usuário:} Modo não-privilegiado de execução. Neste modo somente é possível de se fazer acesso não privilegiado aos recursos do hardware (não podendo acessar as áreas protegidas). Não é possível de se mudar para outro modo de operação quando neste, a não ser por eventos externos como interrupções.
@@ -99,15 +99,6 @@ Existem cerca de 60 interrupções de diversos modulos que podem ser roteadas pa
 
 \textbf{Interrupção de Software: } Existe uma instrução no assembly do ARMv7 que permite que seja feita uma interrupção de software (\verb+swi+). Esta instrução pode ser acompanhada de um número de 8 bits. Esta interrupção leva ao modo supervisor.
 
-%FIQ mode is designed for efficient use by a single owner, using R8_fiq - R13_fiq as global variables. 
-%In addition, unlike IRQs, FIQs are not disabled by other exceptions (apart from reset), making them 
-%the preferred type for real time interrupts, when other exceptions are being used routinely, such as 
-%virtual memory or instruction emulation. IRQs may be disabled for unacceptably long periods of time 
-%while these needs are being serviced.
-%However, if more than one real-time interrupt source is required, there is a conflict of interest. The 
-%new mechanism allows multiple FIQ sources and minimizes the period with FIQs disabled, greatly 
-%reducing the interrupt latency penalty. The FIQ mode registers can be allocated to the highest priority 
-%FIQ as a single owner
 %ARM ARM p. 66.
 
 A Zedboard possui também as seguintes exceções\footnote{Em conceitos básicos está colocada a diferença entre interrupções e exceções}:
@@ -131,7 +122,6 @@ No nível de sistema (\emph{sistem-level (PS)}), há dois grupos independentes d
 
 \section{\emph{Clocks}}
 
-%30 <= PS_CLK <= 60MHZ
 O \emph{clock} principal do sistema, chamado aqui de PS\_CLK (\emph{Processing System Clock}), é responsável por alimentar as 3 PLLs\footnote{\emph{Phase-Locked Loop}. É um sistema de controle que gera uma saída cuja fase é relacionada à fase do sinal de entrada. Pode ser usada para estabilizar um sinal e também multiplica-lo.} do sistema, sendo cada uma dessas PLLs responsável por uma parte diferente do sistema \cite[p.~622]{ug585}. O PS\_CLK é um \emph{clock} de baixa frequência, ficando entre 30 a 60 MHz (PS\_CLK é igual a 33.33 MHz no caso da Zedboard \cite[p.~19]{zed_manual}), sendo este multiplicado por cada uma das 3 PLLs para que o sistema funcione com velocidades maiores\footnote{Este clock pode ser multiplicado por um número de 1 a 127, e é multiplicado por 26 por padrão.}. As 3 PLLs são:
 
 \begin{itemize}

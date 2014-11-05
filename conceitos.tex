@@ -1,7 +1,6 @@
 \chapter{Conceitos Básicos}
 
 Esta seção tem por objetivo o estabelecimento dos conceitos básicos necessários ao entendimento do restante do trabalho. Não pretende-se aqui fazer uma explicação extensiva e profunda sobre os conceitos expostos, mas sim uma breve introdução, deixando os detalhes para serem procurados pelo leitor nas respectivas referências.
-%Listar os nomes mais usados aqui, como MMU, timer, etc, e escrever um parágrafo simples fxemalando o que conceitualmente estes componentes são, sem chegar nas específicidades do hardware, nem tocar nos conceitos do EPOS.
 
 \section{Traits}
 
@@ -186,16 +185,17 @@ A UART (Universal Asynchronous Receiver/Transmitter) é um componente que trata 
 
 \section{Ambiente de Desenvolvimento}
 
-%falar do qemu da xilinx
-
 O ambiente de desenvolvimento usado para o porte foi um qemu para ARM (\verb+qemu-system-arm+) modificado pela Xilinx, para executar o EPOS num ambiente virtualizado (emulado), pois assim pode-se usar ferramentas como o GDB para a depuração do código de forma rápida. O uso do GDB foi fundamental para o desenvolvimento, já que com ele era possível imprimir o valor de cada registrador em um dado ponto da execução, verificar a memória, executar instruções específicas e etc. Para compilar o EPOS foi usado \emph{cross-compilers} para ARM. As flags usadas para criar um ambiente de depuração com o qemu e o GDB foram as sequintes (com cada comando feito em um terminal diferente):
-\hspace*{-1.0cm}\vbox{
+%\hspace*{-1.0cm}\vbox{
 \begin{verbatim}
-./qemu-system-arm -kern-dtb ./xilinx_zynq.dtb -no-reboot -nographic -smp 2 -machine xilinx-zynq-a9 -cpu cortex-a9 -kernel img/panda_app -m 512 -fda img/panda_app.img
+./qemu-system-arm -kern-dtb ./xilinx_zynq.dtb \
+    -no-reboot -nographic -smp 2 -machine xilinx-zynq-a9 \
+    -cpu cortex-a9 -kernel img/panda_app -m 512 \
+    -fda img/panda_app.img
 
 arm-none-eabi-gdb -ex "target remote :1234"
 \end{verbatim}
-}
+%}
 
 O hardware real também estava disponível, e foi usado quando quando o qemu não produzia resultados confiáveis. Com o hardware real, para a depuração do código foi usado o JTAG.
 Para carregar a imagem do SO na placa, foi usada a ferramenta da Xilinx \verb-xmd-, sendo que esta ferramenta trata de fazer o processador apontar para o ponto de entrada da imagem carregada, de tal modo que é possível conectar o GDB através da porta aberta pelo \verb+xmd+, e então executar através do GDB.

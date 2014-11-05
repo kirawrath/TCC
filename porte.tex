@@ -1,12 +1,8 @@
 \chapter{Implementação dos Mediadores de Hardware}
 
-% Eu poderia descrever como eu tenho que incluir cada classe feita em ./include/system/types.h, opções de traits, etc..
-
 Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões tomadas.
 
 A grosso modo, o processo de inicialização do sistema envolve \cite[p.~110]{ug585.1.7}:
-
-% Fazer imagem BONITA sobre a table abaixo
 
 \begin{enumerate}
 	\item Definir a tabela de vetores.
@@ -19,7 +15,7 @@ A grosso modo, o processo de inicialização do sistema envolve \cite[p.~110]{ug
 	\item Pular para o ponto de entrada a aplicação.
 \end{enumerate}
 
-Estes e outros passos (como inicialização do GIC) são explicados em detalhe nas seções que seguem.
+Estes e outros passos (como inicialização do GIC) são explicados em detalhe nas seções que seguem. O primeiro passo a ser feito para iniciar um novo porte é incluir em \verb+./include/system/types.h+ os nomes das classes dos mediadores que serão implementados e criar as pastas necessárias para colocar estas classes, no caso deste porte, foram criadas as pastas \verb+./include/mach/zynq/+, \verb+./src/mach/zynq/+, \verb+./include/arch/armv7/+ e \verb+./src/arch/armv7/+.
 
 
 \section{Mediador da UART}
@@ -121,7 +117,6 @@ Por padrão, as 8 primeiras palavras da memória (ou seja, os primeiros $8 \time
 As demais 7 palavras, pertencentes à tabela de vetores possuem, similarmente, \emph{jumps} para o código onde o tratador da exceção se localiza. A primeira instrução da tabela (posição 0x4) deve conter um \emph{jump} o tratador de uma exceção do tipo undefined instruction, depois, nas próximas palavras, a software interruption, prefectch abort, data abort, reserved, irq e, finalmente, fiq, nesta ordem. Vide seções \ref{sec:interrupt} e \ref{sec:operating_modes} para mais detalhes.
 
 
-%desmontamento do binário da imagem do EPOS
 Desmontando-se o binário da imagem produzida na compilação do EPOS (\emph{dump}), deve-se obter uma saída semelhante a esta exemplificada abaixo em seus primeiros 32 bytes:
 
 \label{dump}
@@ -139,7 +134,7 @@ Desmontando-se o binário da imagem produzida na compilação do EPOS (\emph{dum
 \end{verbatim}
 }
 
-Também foi necessário definir as pilhas (\emph{stacks}) do sistema, assim como reservar um espaço para a pilha dos tratadores de interrupção. O \emph{layout} escolhido segue na tabela \ref{tab:stacks}.
+Também foi necessário definir as pilhas (\emph{stacks}) do sistema, assim como reservar um espaço para a pilha dos tratadores de interrupção. O \emph{layout} escolhido segue na tabela \ref{tab:stacks}. 
 Este é o \emph{layout} usado durante o desenvolvimento. Somente as pilhas de usuário e de algum modo privilegiado (como o supervisor) são necessárias, portanto a pilha de supervisor acabaria por englobar as demais posições que aparecem na tabela \ref{tab:stacks}. Na próxima seção é explicado como foi feito para não precisar reservar espaço na memória para as demais pilhas.
 
 \begin{table}[hb]
@@ -195,6 +190,7 @@ SYS\_HEAP é a \emph{heap} do sistema operacional. Note que as pilhas das \emph{
 	\label{tab:mem}
 \end{table}
 
+Estes valores são editáveis nos \verb+traits+, entretanto também foi necessário atualizar o arquivo \verb+./include/mach/zynq/memory_map.h+.
 
 \section{Porte do Controlador de Interrupções}
 
@@ -217,9 +213,9 @@ Na inicialização do distribuidor, através dos registradores mapeados em memó
 Em seguida configura-se a prioridade de cada interrupção. A princípio todas as interrupções foram definidas como tendo a mesma prioridade, mas isto é configurável caso necessário.
 É configurado então o processador-alvo de cada interrupção, isto é, para quais interfaces de processador uma determinada interrupção será encaminhada. Finalmente então são ativadas as interrupções \cite{gic}.
 
-A inicialização da interface do processador é mais simples. Primeiro se configura a máscara de prioridade da CPU, isto é, qual é o nível de prioridade mínimo que uma interrupção precisa ter para interromper aquele processador. Na implementação, esta máscara está desativada. Depois configura-se a política de grupos de preempção. No GIC é possível separar interrupções em grupos de preempção, onde se define se determinado grupo pode preemptar determinado outro grupo. Todas as interrupções foram colocadas no mesmo grupo e interrupções podem ser preemptadas.
+A inicialização da interface do processador é mais simples. Primeiro se configura a máscara de prioridade da CPU, isto é, qual é o nível de prioridade mínimo que uma interrupção precisa ter para interromper aquele processador. Na implementação, esta máscara está desativada. Depois configura-se a política de grupos de preempção. No GIC é possível separar interrupções em grupos de preempção, onde é definido se determinado grupo pode preemptar determinado outro grupo. Todas as interrupções foram colocadas no mesmo grupo e interrupções podem ser preemptadas.
 
-Adicionalmente a estas configurações, é possível de mascarar as interrupções FIQ e IRQ através do CPSR (\emph{Current Program Status Register}), alterando-se os bits 6 e 7 dele, para mascarar interrupções FIQ e IRQ, respectivamente. Normalmente é o que é feito quando é necessário mascaras as interrupções, enquanto se mantém as configurações do GIC.
+Adicionalmente a estas configurações, é possível de mascarar as interrupções FIQ e IRQ através do CPSR (\emph{Current Program Status Register}), alterando-se os bits 6 e 7 dele, para mascarar interrupções FIQ e IRQ, respectivamente. Normalmente é o que é feito quando é necessário mascarar as interrupções temporariamente, enquanto se mantém as configurações do GIC.
 
 \subsection{Fluxo de execução ao se receber uma interrupção}
 
@@ -271,9 +267,9 @@ O principal tratador é o tratador de interrupções IRQ (\verb+irc_handler+), s
 \end{lstlisting}
 }
 
-Após selecionar qual handler chamar, o processador muda de modo, indo, no caso de uma interrupção IRQ, para o modo de execução IRQ. Neste modo há 3 registradores banqueados: O SPSR, que contém o valor do registrador CPSR imediatamente antes da interrupção, sendo necessário para que seja possível restaurar o valor original do CPSR após tratar a interupção; o LR (\emph{link register}), que contém o endereço da próxima instrução que seria executada imediatamente antes da interrupção mais 4; e, finalmente, o SP (\emph{stack pointer}), que aponta para a pilha própria desde modo (cada modo pode possuir sua própria pilha).
+Após selecionar qual handler chamar do vetor de exceções, o processador muda de modo, indo, no caso de uma interrupção IRQ, para o modo de execução IRQ. Neste modo há 3 registradores banqueados: O SPSR, que contém o valor do registrador CPSR imediatamente antes da interrupção, sendo necessário para que seja possível restaurar o valor original do CPSR após tratar a interupção; o LR (\emph{link register}), que contém o endereço da próxima instrução que seria executada imediatamente antes da interrupção mais 4; e, finalmente, o SP (\emph{stack pointer}), que aponta para a pilha própria desde modo (cada modo pode possuir sua própria pilha).
 
-Para evitar desperdício de memória reservando uma pilha própria apenas para este modo, optou-se por não usar uma pilha no modo IRQ, e, no lugar disto, usar sempre a mesma pilha do modo supervisor (que é o modo de execução do processador quando ele inicia). Para isto, a primeira instrução a executar é uma mudança de modo para voltar ao modo supervisor, enquanto mantendo novas interrupções desligadas; lá é salvo o contexto na pilha daquele modo. Entretanto para que seja possível restaurar o fluxo de execução no mesmo estado em que o processador estava no momento imediatamente antes da interrupção, é necessário voltar ao modo IRQ para obter-se os valores contidos dos registradores banqueados SPSR e LR; após isto, pode-se então voltar ao modo \emph{supervisor}. Na linha 62 do código é somado 24 à pilha pois lá é a posição de memória onde está salvo o PC após ele ter sido empilhado na linha 54, e deseja-se sobreescrever aquele valor do PC pelo valor que estava contido no LR do modo IRQ (menos 4), pois aquela é a próxima instrução que seria executada antes da interrupção. Feito isto, salva-se o valor do SPSR do modo IRQ no topo da pilha (que é o valor do CPSR pré-interrupção), para ser restaurado ao CPSR mais tarde.
+Para evitar desperdício de memória reservando uma pilha própria apenas para este modo, optou-se por não usar uma pilha no modo IRQ, e, no lugar disto, usar sempre a mesma pilha do modo supervisor (que é o modo de execução do processador quando ele inicia), isto também permite um melhor gerenciamento da pilha no caso de preemptação. Para isto, a primeira instrução a executar é uma mudança de modo para voltar ao modo supervisor, enquanto mantendo novas interrupções desligadas; lá é salvo o contexto na pilha daquele modo. Entretanto para que seja possível restaurar o fluxo de execução no mesmo estado em que o processador estava no momento imediatamente antes da interrupção, é necessário voltar ao modo IRQ para obter-se os valores contidos dos registradores banqueados SPSR e LR; após isto, pode-se então voltar ao modo \emph{supervisor}. Na linha 62 do código é somado 24 à pilha pois lá é a posição de memória onde está salvo o PC após ele ter sido empilhado na linha 54, e deseja-se sobreescrever aquele valor do PC pelo valor que estava contido no LR do modo IRQ (menos 4), pois aquela é a próxima instrução que seria executada antes da interrupção. Feito isto, salva-se o valor do SPSR do modo IRQ no topo da pilha (que é o valor do CPSR pré-interrupção), para ser restaurado ao CPSR mais tarde.
 
 Agora que o contexto foi salvo corretamente para ser restaurado, pode-se então chamar um tratador de interrupções genérico (que será discutido mais a frente) e escrito em C++. Após o \verb+int_handler+ da linha 71 retornar, é feita a restauração do contexto. Primeiro se salva o CPSR salvo na pilha no SPSR, na última instrução (\verb+ldmfd+), na forma em que ela está (com um \^{} no final dela e com o PC na lista), ela automaticamente restaurará o valor que está no SPSR para o CPSR. Como o PC está na lista, o fluxo de execução terá retornado a executar as instruções de antes da interrupção ocorrer.
 
@@ -295,7 +291,7 @@ void Zynq_IC::int_handler()
 }
 \end{lstlisting}
 
-A primeira coisa que o tratador faz e descobrir qual é o número da interrupção que foi gerada, para assim saber como tratar aquela interrupção. Isto é feito lendo-se o registrador ICCIAR (\emph{Interrupt Acknowledge Register}), que provê o número da interrupção e também o processador endereçado.
+A primeira coisa que o tratador faz é descobrir qual é o número da interrupção que foi gerada, para assim saber como tratar aquela interrupção. Isto é feito lendo-se o registrador ICCIAR (\emph{Interrupt Acknowledge Register}), que provê o número da interrupção e também o processador endereçado.
 É possível que uma interrupção já tenha sido tratada por outro processador, quando isto acontece, o GIC emite uma \emph{Spurious Interruption} para indicar isto. Quando se detecta isto, o tratador não precisa tomar nenhuma outra ação, basta retornar a execução normal.
 
 Com o número da interrupção em mãos, pode-se então chamar o tratador daquele tipo de interrupção. O \verb+_vector+ é um vetor de \emph{handlers}, onde para cada posição $i$, existe o tratador da interrupção número $i$. Para sinalizar que uma interrupção foi tratada, deve-se escrever no registrador ICCEOI (\emph{End of Interruption}) o número lido no ICCIAR (ou seja, o número da interrupção e processador de destino).
@@ -306,10 +302,6 @@ Normalmente, interrupções de \emph{timer} são o tipo mais frequente de interr
 
 \section{MMU}
 \label{sec:mmu}
-%nice image in p.87 ug585
-
-%na inicialização, é liberada toda a memória, colocando ela numa lista
-%MMU é inteiramente controlada pelo coprocessador CP15
 %http://www.slideshare.net/prabindh/enabling-two-level-translation-tables-in-armv7-mmu
 %http://www.embedded-bits.co.uk/2011/mmucode/
 %http://lxr.free-electrons.com/source/arch/arm/mm/proc-v7-2level.S?a=arm
@@ -318,7 +310,7 @@ Normalmente, interrupções de \emph{timer} são o tipo mais frequente de interr
 
 As principais funções de uma MMU (\emph{Memory Managemend Unit}) são proteção de memória, ou seja, não permitir acesso a certas regiões da memória por processos não autorizados, e de fazer o mapeamento de memória virtual para memória física, mapeamento este que facilita a escrita de aplicações já que o desenvolvedor dela não precisará estar ciente de como a memória é mapeada internamente pelo sistema operacional.
 
-A MMU consegue cumprir estes dois objetivos (e outros mais) através do uso de uma tabela de tradução de páginas (que chamaremos de TTP), onde, a grosso modo, cada linha desta tabela é indexada pelo valor do endereço virtual, e na entrada correspondente há o endereço físico assim como \emph{flags} que indicam, dentre outras coisas, se aquela região pode ou não ser acessada pela aplicação em execução.
+A MMU consegue cumprir estes dois objetivos (e outros mais) através do uso de uma Tabela de Tradução de Páginas (que chamaremos de TTP), onde, a grosso modo, cada linha desta tabela é indexada pelo valor do endereço virtual, e na entrada correspondente há o endereço físico assim como \emph{flags} que indicam, dentre outras coisas, se aquela região pode ou não ser acessada pela aplicação em execução.
 
 Esta tabela é salva na memória principal (RAM) do sistema, e configurar a MMU significa especialmente criar métodos para gerenciar e popular esta tabela. Para entender como isto é feito, será explicado agora como é estruturada esta tabela, como que ocorre a tradução de memória virtual para física, e o que cada entrada da tabela deve ter.
 
@@ -395,9 +387,13 @@ Agora vamos discutir o que cada campo de uma entrada da TTP2 significa.
 
 
 \textbf{TEX:} Controla políticas de compartilhamento de memória, caso aquela região seja compartilhada.
+
 \textbf{C e B:} Estes campos combinados controlam a política de ``cacheamento'' daquela região de memória, ou seja, se ela pode ser salva na cache, e se pode, qual o algoritmo a a ser usado, como \emph{write-back} ou \emph{write-though}, e também políticas de \emph{write-allocate}.
+
 \textbf{S:} Bit que determina que aquela porção de memória é compartilhada entre processadores.
+
 \textbf{nG:} Responsável pela proteção de memória intraprocessos. Uma região marcada como não global (nG = 1) tem associado à ela um número que o SO atribui a cada processo. Isto permite que a TLP possa ter diferentes mapeamentos simultaneamente sem necessidade de substituir uma entrada.
+
 \textbf{xN:} Bit que marca a região como não executável. É importante por questões de segurança, já que o \emph{fetch} especulativo de instruções pode ler uma porção de memória que possui dados sensíveis.
 
 
@@ -442,7 +438,7 @@ Note que num mapeamento completo 1:1, a TTP1 tomaria $4\times4096$ bytes (4KB), 
 
 %Realização deste mapeamento no código:
 
-Em um mapeamento 1 para 1, para popular as TTPs, primeiramente, em um loop, itera-se 512 vezes (já que há 512 de RAM), salvando em posições sucessivas de uma determinada região da memória os endereços das TTP2s, levando-se em conta as \emph{flags} acima mencionadas, após as 512 posições, itera-se pelas por mais 512 posições, mapeando novamente os primeiros 512 MB de memória física. Após isto, mapeia-se as posições restantes em relação 1:1. Feito isto, é necessário também popular cada TTP2 que foi apontada na TTP1, em um processo semelhante. Em um mapeamento por demanda, marca-se as regiões da memória virtual como não mapeadas, com a diferença que, ao invés de apenas abortar o acesso, cria-se dinamicamente aquele mapeamento.
+Em um mapeamento 1 para 1, para popular as TTPs, primeiramente, em um loop, itera-se 512 vezes (já que há 512 de RAM), salvando em posições sucessivas de uma determinada região da memória os endereços das TTP2s, levando-se em conta as \emph{flags} acima mencionadas, após as 512 posições, itera-se pelas por mais 512 posições, mapeando novamente os primeiros 512 MB de memória física. Após isto, mapeia-se as posições restantes em relação 1:1. Feito isto, é necessário também popular cada TTP2 que foi apontada pela TTP1, em um processo semelhante. Em um mapeamento por demanda, marca-se as regiões da memória virtual como não mapeadas, com a diferença que, ao invés de apenas abortar o acesso, cria-se dinamicamente aquele mapeamento.
 
 Após feita as tabelas, a MMU está pronta para ser ativada. A MMU é controlada pelo coprocessador CP15, é nele que são guardados os registradores de configuração, endereço base para a TTP, dentre outras funções. Escrevendo-se 1 no bit menos significativo no registrador c1 (SCTLR) deste coprocessador, a MMU é ativada.
 
@@ -478,7 +474,5 @@ Ao se ligar a placa, apenas a CPU0 executa código, e é função dela fazer as 
 
 Isto é suficiente para fazer o segundo processador passar a executar código, entretanto esta é a parte simples, ter dois processadores rodando tem várias implicações sobre como deve ser o \emph{design} de cada componente do sistema, pois agora há a preocupação com coerência e consistência de memória, condições de corrida {\emph{racing conditions}) e etc.
 
-Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, assim como ativar seu \emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como citado na seção \ref{sec:mmu}.
-
-
+Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, bem como criar uma pilha própria para a CPU1, assim como ativar seu \emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como citado na seção \ref{sec:mmu}.
 
