@@ -10,7 +10,7 @@ Neste trabalho foi discutido como se dá a interação software-hardware do sist
 %Fale de trabalhos futuros na conclusão! Frisar bastante os trabalhos que podem ser construídos em cima do porte, como o quadcoptero e a tese do Giovani.
 
 O EPOS é o o primeiro RTOS de código aberto a suportar os escalonadores de tempo real global, particionado e agrupado \cite{gio}. Assim sendo, este porte abre várias novas linhas de pesquisa de aplicação para este sistema operacional, em particular na área de escalonadores de tempo real.
-Uma possível nova aplicação do EPOS é o controle de um quadcóptero. Com os algoritmos de tempo real que estão implementados no makEPOS, e com os recursos da Zedboard, ampla pesquisa pode ser feita, e novos horizontes de aplicação se abrem.
+Uma possível nova aplicação do EPOS é o controle de um quadcóptero. Com os algoritmos de tempo real que estão implementados no EPOS, e com os recursos da Zedboard, ampla pesquisa pode ser feita, e novos horizontes de aplicação se abrem.
 
 %Citar também os contadores de desempenho em hardware o lock e unlock da cache compartilhada, escalonamento heterogêneo.
 Como trabalho futuro, este porte pode servir para uma maior validação do escalonador feito em \cite{gio}, pois a Zedboard possui os recursos de hardware necessários para sua implementação (\emph{lock/unlock} de linhas de cache, contadores de desempenho e capacidade de configurar a CPU-alvo de uma interrupção), e naquele trabalho foi usado um IA32 como plataforma de validação, que é uma arquitetura de menor previsibilidade que a Zedboard, e portanto essa pesquisa teria uma sustentação melhor sendo aplicada nesta placa.

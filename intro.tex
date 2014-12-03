@@ -2,15 +2,15 @@
 
 %1) Começar escrevendo sobre a importância de sistemas embarcados;
 
-Sistemas embarcados estão instalados e controlam os mais diversos equipamentos hoje em dia, eles estão mais presentes do que nos damos conta. Conforme eles estão sendo cada vez mais empregados, sua demanda aumenta também, bem como seu poder de processamento. Máquinas que antes utilizavam vários pequenos microcontroladores trabalhando independentemente, hoje podem ser gerenciados com melhor custo-benefício por um sistema de maior desempenho.%, como há exemplos em carros e aviões.
+Sistemas embarcados estão instalados e controlam os mais diversos equipamentos hoje em dia, eles estão mais presentes do que nos damos conta. Conforme eles estão sendo cada vez mais empregados, sua demanda aumenta também, bem como seu poder de processamento. Máquinas que antes utilizavam vários pequenos microcontroladores trabalhando independentemente, hoje podem ser gerenciados com melhor custo-benefício por um sistema de maior desempenho \cite{gio}.%, como há exemplos em carros e aviões.
 
 %2) Citar que alguns desses sistemas demandam maior processamento que só pode ser satisfeito por um hardware dedicado ou por um processador multicore;
 
-Hoje sistemas embarcados estão empregados em tarefas que exigem a manipulação de grande volume de dados (muitas vezes em tempo real), como na área de comunicação e transmissão de dados. O nome ``sistema embarcado'' já foi sinônimo de pequenos microcontroladores dedicados, mas hoje também há grande demanda por sistemas embarcados de alto desempenho. Uma meio de obter-se processamento de alto desempenho à baixo custo é com a implantação de processadores \emph{multicores}.
+Sistemas embarcados estão empregados em tarefas que exigem a manipulação de grande volume de dados (muitas vezes em tempo real), como na área de comunicação e transmissão de dados. O nome ``sistema embarcado'' já foi sinônimo de pequenos microcontroladores dedicados, mas hoje também há grande demanda por sistemas embarcados de alto desempenho. Um meio de obter processamento de alto desempenho à baixo custo é com a implantação de processadores \emph{multicores}.
 
-Aplicações de tempo real necessitam um tempo de resposta previsível, e suas tarefas devem ser executadas sem atrasos (no caso de tempo real crítico). Um exemplo são os sistemas de airbag automotivo, que necessitam de uma resposta a um estímulo em um determinado intervalo de tempo \cite{nat}. Muitas destas aplicações são feitas diretamente em hardware para se adequar aos requesitos da aplicação (tempo real, gasto energético, etc). Entretanto aplicações feitas diretamente em hardware apresentam problemas em relação à manutenibilidade e possibilidade de atualização \cite{gio}. Estes componentes de hardware poderiam ser centralizados em um sistema embarcado de maior processamento, e alocar tarefas de tempo real para cada uma das funções necessárias ao sistema. Deste modo, a manutenção e custo total do sistema pode ser melhorado, isto enquanto mantem-se todas as restrições temporais.
+Aplicações de tempo real necessitam um tempo de resposta previsível, e suas tarefas devem ser executadas com atraso controlável. Um exemplo são os sistemas de airbag automotivo, que necessitam de uma resposta a um estímulo em um determinado intervalo de tempo \cite{nat}. Muitas destas aplicações são feitas diretamente em hardware para se adequar aos requisitos da aplicação (tempo real, gasto energético, etc). Entretanto aplicações feitas diretamente em hardware apresentam problemas em relação à manutenibilidade e possibilidade de atualização \cite{gio}. Estes componentes de hardware poderiam ser centralizados em um sistema embarcado de maior processamento, e alocar tarefas de tempo real para cada uma das funções necessárias ao sistema. Deste modo, a manutenção e custo total do sistema pode ser melhorado, sem necessitar sacrificar as restrições temporais (usando um sistema operacional de tempo real que consiga escalonar o conjunto de tarefas).
 
-Outro exemplo são os quadcópteros. Controlar um quadcóptero não é uma tarefa trivial, há uma miríade de fatores a serem considerados. Um quadcóptero precisa balancear quanto empuxo deve ser aplicado à cada hélice para manter-se no ar e fazer manobras, é necessário também que o sistema seja tolerante à faltas para ser seguro. Em caso de um quadcóptero autônomo, os desafios são ainda maiores. Passa a ser necessário geolocalização, detectar à que distancia se está do chão, controle de pouso, etc \cite{leeseshia}.
+Outro exemplo são os quadcópteros. Controlar um quadcóptero não é uma tarefa trivial, há uma miríade de fatores a serem considerados. Um quadcóptero precisa balancear quanto empuxo deve ser aplicado à cada hélice para manter-se no ar e fazer manobras, é necessário também que o sistema seja tolerante à faltas para ser seguro. Em caso de um quadcóptero autônomo, os desafios são ainda maiores. Passa a ser necessário geolocalização, detectar à que distância se está do chão, controle de pouso, etc \cite{leeseshia}.
 Não é difícil perceber a grande quantidade de dados a serem processados, e que uma falha em processar estes dados no tempo estimado pode gerar numa falha total do sistema (a queda do quadcóptero, neste caso). Neste exemplo, nota-se como é necessário um sistema operacional previsível, e um hardware capaz de processar rapidamente e paralelamente diversos dados.
 
 %%%%%%%%%%%%%% EPOS %%%%%%%%%%%%%%%%%
@@ -18,11 +18,11 @@ Não é difícil perceber a grande quantidade de dados a serem processados, e qu
 %4) Falar da importância de sistemas operacionais de tempo real para sistemas embarcados multicore, principalmente devido ao escalonador;
 
 É natural que estas plataformas de maior desempenho, que consequentemente possuem mais recursos e componentes à serem gerenciados, necessitem de um sistema operacional que se encarregue desta função, e que possam administrar eficientemente estes recursos.
-De acordo com um estudo recente \cite{UBM}, 68\% dos projetos em computação embarcada usam sistemas operacionais, sendo a principal razão para isto é ter garantias de tempo real.
+De acordo com um estudo recente \cite{UBM}, a principal razão para usar um sistema operacional é ter garantias de tempo real.
 
-De acordo com este mesmo estudo \cite{UBM}, metade dos projetos de sistemas embarcados usaram mais que um microcontrolador/processador em seu projeto, e 29\% dos processadores usados nestes projetos possuem um \emph{clock} superior à 500 MHz, sendo que a média de \emph{clock} destes projetos é de 485 MHz.
+De acordo com este mesmo estudo \cite{UBM}, metade dos projetos de sistemas embarcados usaram mais que um microcontrolador/processador em seu projeto.
 Além disto, tem sido comum o uso de FPGAs\footnote{FPGAs podem ser pensadas como um hardware que pode ser programado pelo usuário.} integradas à estes sistemas, onde 31\% dos projetos usaram FPGAs em 2013.
-Dentre estas placas, podemos destacar a Zedboard, que é uma plataforma de bom desempenho com um processador \emph{dualcore} de 666 MHz e FPGA.
+Dentre estas placas, podemos destacar a Zedboard, que é uma plataforma de bom desempenho\footnote{Comparado ao poder de processamento dos demais processadores embarcados.} com um processador \emph{dualcore} de 666 MHz e FPGA.
 
 %5) Citar o EPOS como primeiro RTOS de código aberto a suportar  os escalonadores global, particionado e agrupado;
 
@@ -41,8 +41,7 @@ Este trabalho trata de descrever como foi feito o porte
 
 \section{Objetivos Gerais}
 
-O objetivo deste trabalho é portar o sistema operacional EPOS e documentar este processo no presente documento. O porte consiste em adaptar os componentes que, dentro da arquitetura do EPOS, são chamados de mediadores de hardware. Cada mediador precisa ser refeito para cada plataforma.
-Este trabalho terá certo direcionamento para as pessoas que no futuro precisem fazer um novo porte do EPOS, de modo que elas não precisem passar pelos mesmos problemas e possam, portanto, fazer isto mais eficientemente.
+O objetivo deste trabalho é portar o sistema operacional EPOS para a Zedboard e documentar este processo no presente documento. O porte consiste em adaptar os componentes que, dentro da arquitetura do EPOS, são chamados de mediadores de hardware. Cada mediador precisa ser refeito para cada plataforma\footnote{Aqui chamamos de plataforma qualquer SoC (\emph{System On-Chip}), ou processador. No capítulo \ref{ch:epos} será explicado a diferença entre \emph{machine} e \emph{architecture}, e por enquanto estamos usando a palavra plataforma para nos referenciarmos a estes dois conceitos simultaneamente.}
 
 \section{Objetivos Específicos}
 Dos objetivos específicos, pode-se organizá-los da seguinte forma:
@@ -51,10 +50,10 @@ Dos objetivos específicos, pode-se organizá-los da seguinte forma:
     \item Estudo da arquitetura do EPOS, da arquitetura do ARM Cortex A9 e do Zedboard.
     \item Portes
     \begin{enumerate}
+		\item UART
         \item Timers
         \item Controlador de Interrupção
         \item MMU
-		\item UART
 		\item CPU
 		\item Inicialização \emph{multicore}
     \end{enumerate}
@@ -69,3 +68,7 @@ Dos objetivos específicos, pode-se organizá-los da seguinte forma:
 %    \end{enumerate}
     \item Documentação
 \end{enumerate}
+
+\section{Organização do Documento}
+
+O restante deste documento é organizado da seguinte forma: No capílo de conceitos básicos serão discutidos de forma suscinta conceitos usados ao longo do trabalho; no capítulo seguinte será dado uma visão geral do hardware escolhido para o porte; no capítulo \ref{ch:epos} será discutido a arquitetura do EPOS, sob um ponto de vista de mais alto nível, sem ainda chegar nos mediadores; e, finalmente, no capítulo \ref{ch:porte}, será explicado o porte em si, comentando as decisões que foram tomadas e como foi organizado o porte\footnote{Organização da memória, sequência de inicialização, etc.}.

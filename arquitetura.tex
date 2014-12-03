@@ -2,7 +2,7 @@
 
 %source: http://www.zedboard.org/product/zedboard
 % http://www.zedboard.org/sites/default/files/documentations/ZedBoard_HW_UG_v2_2.pdf
-Zedboard é uma plataforma de desenvolvimento que suporta uma grande variedade de aplicações, visto que ela possui uma boa gama de interfaces e funções para habilitar isto. É dedicada à prototipação e \emph{proof-of-concept}. Em seu interior ela possui um Xilinx Zynq 7000 (Z-7020), que é a arquitetura alvo deste porte. A figura \ref{fig:zed} mostra como é a placa fisicamente. Zynq 7020 possui um processador \emph{dual core} Cortex A9, cada core possui sua própria MMU e memória cache L1 (instruções e dados) privada.
+Zedboard é uma plataforma de desenvolvimento que suporta uma grande variedade de aplicações, visto que ela possui uma boa gama de interfaces e funções para habilitar isto. É dedicada à prototipação e \emph{proof-of-concept}. Em seu interior ela possui um Xilinx Zynq 7000 (Z-7020), que é a arquitetura alvo deste porte. A figura \ref{fig:zedboard} mostra como é a placa fisicamente. Zynq 7020 possui um processador \emph{dual core} Cortex A9, cada core possui sua própria MMU e memória cache L1 (instruções e dados) privada.
 
 O ZYNQ-7000 SOC XC7Z020-CLG484-1 conta com o processador Dual ARM Cortex-A9 MPCore. O Zynq possui 4 graduações de velocidade de \emph{clock}, a comercial (graduação -1), industrial (graduação -1 a -2), estendida (-2 a -3) e expandida (-1), sendo a graduação -1 a menor velocidade, e a -3 a maior \cite{product_table}.
 
@@ -26,7 +26,7 @@ A família Zynq 7000 disponibiliza para o desenvolvedor FPGAs, tornando esta pla
 
 \section{Modos de Operação}
 \label{sec:operating_modes}
-A arquitetura ARMv7 conta com 9 modos de operação (7 por padrão, mais 2 com extensões habilidadas), sendo que o único modo não privilegiado é o modo de usuário, os demais modos padrão possuem o mesmo privilégio dentro do sistema\footnote{O modo hipervisor possui certas funções que os demais modos não oferecem, mas no que diz respeito à acesso a memória e execução de instruções, ainda é o mesmo nível de privilégio.}. A principal diferença entre um modo e outro é que cada modo conta com um certo subconjunto privado de registradores banqueados, visiveis somente no modo em vigência, como ilustra a imagem \ref{fig:banked}. A tabela \ref{tab:processormode} ilustra quais são os modos de operação disponíveis \cite[p.~1139]{armarm}.
+A arquitetura ARMv7 conta com 9 modos de operação (7 por padrão, mais 2 com extensões habilidadas), sendo que o único modo não privilegiado é o modo de usuário, os demais modos padrão possuem o mesmo privilégio dentro do sistema\footnote{O modo hipervisor possui certas funções que os demais modos não oferecem, mas no que diz respeito à acesso a memória e execução de instruções, ainda é o mesmo nível de privilégio.}. A principal diferença entre um modo e outro é que cada modo conta com um certo subconjunto privado de registradores banqueados, visiveis somente no modo em vigência, como ilustra a figura \ref{fig:banked}. A tabela \ref{tab:processormode} ilustra quais são os modos de operação disponíveis \cite[p.~1139]{armarm}.
 O campo ``Codificação'' é usado no registrador CPSR para se verificar ou modificar o modo de operação vigente.
 
 \begin{table}[ht]
@@ -51,7 +51,7 @@ System & 11111 & Sempre\\[1ex]
 \label{tab:processormode}
 \end{table}
 
-\textbf{Modo Usuário:} Modo não-privilegiado de execução. Neste modo somente é possível de se fazer acesso não privilegiado aos recursos do hardware (não podendo acessar as áreas protegidas). Não é possível de se mudar para outro modo de operação quando neste, a não ser por eventos externos como interrupções.
+\textbf{Modo Usuário:} Modo não-privilegiado de execução. Neste modo somente é possível de se fazer acesso não privilegiado aos recursos do hardware (não podendo acessar as áreas protegidas). Não é possível mudar para outro modo de operação quando neste, a não ser por eventos externos como interrupções.
 
 \textbf{Modo Sistema:} Modo privilegiado de execução. Este modo usa os mesmos registradores que o modo usuário e nenhuma exceção leva a este modo. Somente é possível de entrar nesse modo alterando os bits do registrador de status do sistema (CPSR); é necessário já estar em algum modo privilegiado para tal operação.
 
@@ -75,7 +75,7 @@ Para gerar um \emph{Supervisor Call}, usa-se a instrução \verb+svc+. O process
 	\centerline{
     \includegraphics[width=12cm]{figuras/banked_registers}
 	}
-    \caption{Registradores banqueados.}
+	\caption{Registradores banqueados (os modos especiais \emph{hypervisor} e \emph{monitor} não estão contemplados).}
 	\label{fig:banked}
 \end{figure}
 
@@ -85,7 +85,7 @@ Para gerar um \emph{Supervisor Call}, usa-se a instrução \verb+svc+. O process
 O GIC (\emph{Generic Interrupt Controller}) é um componente que centraliza e administra todas as interrupções do sistema, ativando, desativando, mascarando e priorizando as fontes de interrupção.
 
 
-\section{Tipos de Interrupção} %ug585 p. 192
+\subsection{Tipos de Interrupção} %ug585 p. 192
 \label{sec:interrupt}
 \textbf{Interrupção Gerada por Software: }
 Cada CPU pode se interromper, interromper outra CPU, ou ambas CPUs usando SGIs (\emph{Software Generated Interrupts}). Existem 16 interrupções geradas por software, que podem ser geradas escrevendo o número da interrupção ([0-15]), junto com o número da CPU alvo no registrador ICDSGIR. Esta escrita ocorre dentro do barramento privado da própria CPU. Cada CPU possui seu próprio conjunto privado de registradores de SGIs para gerarem uma (ou mais) das 16 SGIs possíveis \cite[p.~216]{ug585.1.7}. É possível limpar uma interrupção lendo o registrador ICCIAR (\emph{Interrupt Acknowledge}) ou escrevendo 1 nos bits correspondentes do registrador ICDICPR (\emph{Interrupt Clear-Pending}).
@@ -117,7 +117,7 @@ Há duas situações que geram esta interrupção: Quando se executa instruçõe
 
 \section{\emph{Timers}}
 Cada um dos \emph{cores} possui um \emph{timer} privado de 32 bits e ambos \emph{cores} compartilham um \emph{timer} global de 64 bits. Estes \emph{timers} trabalham numa frequência sempre igual à metade da frequência da CPU.
-No nível de sistema (\emph{sistem-level (PS)}), há dois grupos independentes de \emph{timers}, cada grupo com 3 \emph{timers}.
+No nível de sistema (\emph{system-level (PS)}), há dois grupos independentes de \emph{timers}, cada grupo com 3 \emph{timers}.
 
 
 \section{\emph{Clocks}}

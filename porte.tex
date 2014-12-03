@@ -1,8 +1,9 @@
 \chapter{Implementação dos Mediadores de Hardware}
+\label{ch:porte}
 
 Nesta seção será discutido como foi o porte de cada mediador de hardware, explicando as decisões tomadas.
 
-A grosso modo, o processo de inicialização do sistema envolve \cite[p.~110]{ug585.1.7}:
+O processo de inicialização do sistema envolve as seguintes ações \cite[p.~110]{ug585.1.7}:
 
 \begin{enumerate}
 	\item Definir a tabela de vetores.
@@ -15,7 +16,7 @@ A grosso modo, o processo de inicialização do sistema envolve \cite[p.~110]{ug
 	\item Pular para o ponto de entrada a aplicação.
 \end{enumerate}
 
-Estes e outros passos (como inicialização do GIC) são explicados em detalhe nas seções que seguem. O primeiro passo a ser feito para iniciar um novo porte é incluir em \verb+./include/system/types.h+ os nomes das classes dos mediadores que serão implementados e criar as pastas necessárias para colocar estas classes, no caso deste porte, foram criadas as pastas \verb+./include/mach/zynq/+, \verb+./src/mach/zynq/+, \verb+./include/arch/armv7/+ e \verb+./src/arch/armv7/+.
+Estes e outros passos (como inicialização do GIC, timer, UART, CPU, etc) são explicados em detalhe nas seções que seguem. O primeiro passo a ser feito para iniciar um novo porte é incluir em \verb+./include/system/types.h+ os nomes das classes dos mediadores que serão implementados e criar as pastas necessárias para colocar estas classes, no caso deste porte, foram criadas as pastas \verb+./include/mach/zynq/+, \verb+./src/mach/zynq/+, \verb+./include/arch/armv7/+ e \verb+./src/arch/armv7/+.
 
 
 \section{Mediador da UART}
@@ -192,13 +193,13 @@ SYS\_HEAP é a \emph{heap} do sistema operacional. Note que as pilhas das \emph{
 
 Estes valores são editáveis nos \verb+traits+, entretanto também foi necessário atualizar o arquivo \verb+./include/mach/zynq/memory_map.h+.
 
-\section{Porte do Controlador de Interrupções}
+\section{Controlador de Interrupções}
 
 Para se usar o controlador de interrupções (que será referenciado como GIC no restante desta seção, de \emph{Generic Interrupt Controller}), é necessário antes inicializar o distribuidor de interrupções e as interfaces dos processadores.
 
 É no distribuidor que é determinada a prioridade de cada interrupção, e onde é decidido se determinada interrupção deve ou não ser encaminhada para a interface de um determinado processador. Todas as interrupções passam por ele.
 
-A interface dos processadores é por onde os processadores se comunicam com o GIC. Nela o processador pode confirmar que recebeu a interrupção (\emph{acknowledge}), indicar que terminou de tratar a mesma, definir prioridades entre diferentes interrupções, indicar uma política de preempção de interrupções, ou mesmo desligar esta interface. Como o GIC é dividido logicamente é ilutrado na imagem \ref{img:gic}.
+A interface dos processadores é por onde os processadores se comunicam com o GIC. Nela o processador pode confirmar que recebeu a interrupção (\emph{acknowledge}), indicar que terminou de tratar a mesma, definir prioridades entre diferentes interrupções, indicar uma política de preempção de interrupções, ou mesmo desligar esta interface. Como o GIC é dividido logicamente é ilustrado na imagem \ref{img:gic}.
 
 \begin{figure}[ht!]
     \centering
