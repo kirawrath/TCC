@@ -113,6 +113,7 @@ Precisamos agora definir o \verb+prescaler+. Definimos ele como a razão entre o
 
 
 \section{Mapeamento de Memória}
+\label{sec:map}
 
 Por padrão, as 8 primeiras palavras da memória (ou seja, os primeiros $8 \times 4 = 32$ bytes) devem possuir instruções específicas. A primeira palavra (memória posição 0) contém a primeira instrução a ser executada, e, nas 7 palavras seguintes, fica a tabela de vetores (\emph{vector table}). Como abaixo da instrução inicial há uma tabela que não se deseja executar no momento de inicialização do sistema, esta primeira instrução necessariamente é um \emph{jump} para uma outra região, para aí então se iniciar o processo de \emph{boot}. 
 As demais 7 palavras, pertencentes à tabela de vetores possuem, similarmente, \emph{jumps} para o código onde o tratador da exceção se localiza. A primeira instrução da tabela (posição 0x4) deve conter um \emph{jump} o tratador de uma exceção do tipo undefined instruction, depois, nas próximas palavras, a software interruption, prefectch abort, data abort, reserved, irq e, finalmente, fiq, nesta ordem. Vide seções \ref{sec:interrupt} e \ref{sec:operating_modes} para mais detalhes.
@@ -476,4 +477,68 @@ Ao se ligar a placa, apenas a CPU0 executa código, e é função dela fazer as 
 Isto é suficiente para fazer o segundo processador passar a executar código, entretanto esta é a parte simples, ter dois processadores rodando tem várias implicações sobre como deve ser o \emph{design} de cada componente do sistema, pois agora há a preocupação com coerência e consistência de memória, condições de corrida {\emph{racing conditions}) e etc.
 
 Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, bem como criar uma pilha própria para a CPU1, assim como ativar seu \emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como citado na seção \ref{sec:mmu}.
+
+\fig{0.8}{cpu1_init}{Ponto de entrada da CPU 1 durante a inicialização.}
+
+É necessário também definir um ponto de entrada para o segundo processador.
+Foi escolhido iniciar o segundo processador já desde os primeiros estágios da inicialização do sistema, como é ilustrado na figura \ref{fig:cpu1_init}. Dentro de classes como \verb+Init_System+, onde são inicializado os mediadores do sistema, há desvios de fluxo (\verb=if's=) para inicializar apenas o que for pertinente para cada processador inicializar. Por exemplo, o \emph{timer} pode ser inicializado para cada \emph{core}, já a MMU não precisa ser inicializada duas vezes.
+
+\subsection{Simetria}
+
+Há duas estratégias comuns de lidar com multicores: Simétrica e assimétrica. Abaixo é definido o significado destes conceitos.\\[10pt]
+%\begin{description}
+%	\item[Simétrico:]
+\textbf{Simétrico:}
+
+		\begin{itemize}
+			\item Cada processador tem as mesmas funções.
+			\item Único SO para todos os processadores.
+			\item Qualquer processador pode executar tanto a aplicação quanto o SO.
+			\item Processadores precisam ser fisicamente idênticos.
+		\end{itemize}
+%	\item[Assimétrico:] 
+\textbf{Assimétrico:}
+
+		\begin{itemize}
+			\item Cada processador possui uma função específica
+			\item Possibilidade de executar mais de um SO no sistema (no máximo 1 por processador).
+			\item SO é executado por um único processador (ou subconjunto de processadores).
+			\item Pode ser implementado em arquiteturas com processadores idênticos ou diferentes.
+		\end{itemize}
+%\end{description}
+
+Note que os itens de cada conceito são flexíveis, podendo haver mistura de alguns itens.
+Designs assimétricos costumam ser empregados em arquiteturas que possuem processadores difererentes em sua arquitetura, geralmente um deles sendo de menor poder de processamento e consumo de energia, enquanto o outro processador, de melhor desempenho, executa tarefas que exigem maior poder de processamento. Entretanto mesmo com processadores idênticos (no nosso caso, ambos \emph{cores} da Zedboard são idênticos), é possível de designar tarefas diferentes para cada processador, algo bastante usado em computação distribuída.
+
+Na implementação feita, foi escolhido do design simétrico, significando que o EPOS é executado por todos os processadores, assim como a aplicação. O EPOS já possuia certo suporte para isto, pois ele ha havia sido portado para um IA32 \emph{multicore}, implementado de forma simétrica.
+A decisão sobre qual é o melhor design depende muito do tipo da aplicação, e para as aplicações atuais do EPOS, o modelo simétrico é adequado.
+
+
+\subsection{Testes}
+
+Os testes foram feitos em duas plataformas: Simulação com o virtualizador de sistemas operacionais \verb=qemu=, e com uma Zedboard física.
+
+Como explicado na seção \ref{sec:map}, e ilustrado na figura \ref{fig:memory_map}, os primeiros 512 MB do espaço de endereçamento virtual é mapeado numa relação 1:1 com a memória física, e então os 512 MB de memória seguintes são mapeados também para os primeiros 512 MB de memória física.
+
+Logo, se a MMU estiver ativa, o endereço virtual X (para X $\in [0..512MB]$) e X+512 MB apontam para a mesma posição de memória física.
+Portanto, o teste consistiu em, antes de ligar a MMU, escrever um número numa posição de memória X, e então ler o a posição X e X+512MB, e que evidentemente estas posições possuem valores diferentes. Então a MMU é ligada, e é lido novamente a posição X e X+512 MB, resultando agora no mesmo número, mostrando que o mapeamento está funcionando.
+
+A UART funcionou sem problemas no \verb=qemu=. Na placa, por via de um cabo usb, leu-se os dados pelo \verb=cutecom=. Em geral funcionou bem, apesar que pode ocorrer a perda de alguns caracteres dependendo da taxa de transmissão.
+
+O porte do GIC foi mais problemático.
+O \verb=qemu= mostrou diferentes comportamentos quando usado diferentes versões, fazendo com que certas configurações do GIC funcionassem apenas em algumas versões. Foi possível analisar o comportamento das exceções e dos seus tratadores, entretanto as interrupções não pareciam estar sendo geradas nos intervalos corretos configurados no \verb=timer=, o que levou à conclusão que este componente só pode ser validado na placa física. Entretanto o GIC se mostrou não responsível, independente da configuração tentada. Foi feito relatórios a respeito, indicando como não seria possível, dentro das instruções do manual, este comportamento, indicando a possibilidade do manual estar incompleto. Será necessário analisar outros códigos que usam a Zedboard.
+
+%timer
+O \verb=timer= foi validado usando um \verb=Chronometer=, para contar por uma certa quantidade de tempo, e então é lido quanto tempo passou. 
+
+
+%multicore
+%cpu?
+
+
+
+
+
+
+
 
