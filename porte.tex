@@ -514,26 +514,31 @@ Na implementação feita, foi escolhido do design simétrico, significando que o
 A decisão sobre qual é o melhor design depende muito do tipo da aplicação, e para as aplicações atuais do EPOS, o modelo simétrico é adequado.
 
 
-\subsection{Testes}
+\section{Testes}
 
-Os testes foram feitos em duas plataformas: Simulação com o virtualizador de sistemas operacionais \verb=qemu=, e com uma Zedboard física.
+Os testes foram feitos em dois ambientes: Simulação com o virtualizador de sistemas operacionais \verb=qemu=, e com uma Zedboard física.
 
-Como explicado na seção \ref{sec:map}, e ilustrado na figura \ref{fig:memory_map}, os primeiros 512 MB do espaço de endereçamento virtual é mapeado numa relação 1:1 com a memória física, e então os 512 MB de memória seguintes são mapeados também para os primeiros 512 MB de memória física.
+\textbf{MMU: }
+Como explicado na seção \ref{sec:map}, e ilustrado na figura \ref{fig:memory_map}, os primeiros 512 MB do espaço de endereçamento virtual são mapeados numa relação 1:1 com a memória física, e então os 512 MB de memória seguintes são mapeados também para os primeiros 512 MB de memória física.
 
 Logo, se a MMU estiver ativa, o endereço virtual X (para X $\in [0..512MB]$) e X+512 MB apontam para a mesma posição de memória física.
-Portanto, o teste consistiu em, antes de ligar a MMU, escrever um número numa posição de memória X, e então ler o a posição X e X+512MB, e que evidentemente estas posições possuem valores diferentes. Então a MMU é ligada, e é lido novamente a posição X e X+512 MB, resultando agora no mesmo número, mostrando que o mapeamento está funcionando.
+Portanto, o teste consistiu em, antes de ligar a MMU, escrever um número numa posição de memória X, e então ler as posições X e X+512MB, e notar que evidentemente estas posições possuem valores diferentes. Então a MMU é ligada, e é lido novamente as posições X e X+512 MB, resultando agora no mesmo número, mostrando que a MMU esta ativa e traduzindo corretamente os endereços de memória virtuais.
 
-A UART funcionou sem problemas no \verb=qemu=. Na placa, por via de um cabo usb, leu-se os dados pelo \verb=cutecom=. Em geral funcionou bem, apesar que pode ocorrer a perda de alguns caracteres dependendo da taxa de transmissão.
+\textbf{UART: }
+A UART funcionou sem problemas no \verb=qemu=. Na placa, por via de um cabo usb, leu-se os dados pelo \verb=cutecom=. Os caracteres são enviados com sucesso pelo cabo serial. Pode ocorrer a perda de alguns caracteres dependendo da taxa de transmissão escolhida.
 
-O porte do GIC foi mais problemático.
-O \verb=qemu= mostrou diferentes comportamentos quando usado diferentes versões, fazendo com que certas configurações do GIC funcionassem apenas em algumas versões. Foi possível analisar o comportamento das exceções e dos seus tratadores, entretanto as interrupções não pareciam estar sendo geradas nos intervalos corretos configurados no \verb=timer=, o que levou à conclusão que este componente só pode ser validado na placa física. Entretanto o GIC se mostrou não responsível, independente da configuração tentada. Foi feito relatórios a respeito, indicando como não seria possível, dentro das instruções do manual, este comportamento, indicando a possibilidade do manual estar incompleto. Será necessário analisar outros códigos que usam a Zedboard.
+\textbf{GIC: }
+No porte do GIC, o \verb=qemu= mostrou diferentes comportamentos quando usado diferentes versões, fazendo com que certas configurações do GIC funcionassem apenas em algumas versões. Foi possível analisar o comportamento das exceções e dos seus tratadores, entretanto as interrupções não pareciam estar sendo geradas nos intervalos corretos configurados no \verb=timer=, o que levou à conclusão que este componente só pode ser validado com precisão na placa física. Entretanto o GIC se mostrou não responsível na Zedboard, independente da configuração tentada. Foi feito um relatório a respeito, onde é exposto como, dentro das instruções do manual, este comportamento não pode corresponder ao esperado de acordo com o manual, indicando a possibilidade dele estar incompleto. Será necessário analisar outros códigos que usam a Zedboard.
 
 %timer
-O \verb=timer= foi validado usando um \verb=Chronometer=, para contar por uma certa quantidade de tempo, e então é lido quanto tempo passou. 
-
+\textbf{Timer: }
+O \verb=timer= foi validado usando um \verb=Chronometer=, para contar por uma certa quantidade de tempo, onde após isto foi lido quanto tempo passou. Devido aos problemas descritos acima, na placa física o \verb+timer+ foi testado lendo-se o registrador mapeado em memória referente ao atual número que está sendo contado no \verb+timer+, onde constatou-se que ele de fato está operante e fazendo suas contagens de forma periódica.
 
 %multicore
-%cpu?
+\textbf{Multicore: }
+No \verb+qemu+ o segundo core foi ligado de forma bem sucedida, sincronizando sua inicialização nas barreiras que já existiam no EPOS com o primeiro \emph{core}, inicializando apenas os mediadores que eram necessários, e finalmente criando e executando suas \emph{threads} (thread \verb+main+ para o processador 0, e uma \verb=idle= no caso do processador 1). Como o segundo \emph{core} é ativado através de uma interrupção vinda da instrução \verb+sev+, as dificuldades com o GIC impediram a análise do comportamento na placa.
+
+%cpu
 
 
 
