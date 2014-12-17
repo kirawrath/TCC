@@ -478,7 +478,7 @@ Isto é suficiente para fazer o segundo processador passar a executar código, e
 
 Um exemplo de componente que deve que ser adaptado para levar em conta que há mais de um processador, está no código da página \pageref{int_handler}, pois apenas o CPU0 pode escalonar processos no \emph{design} escolhido. Também é necessário levar em conta o fato de que agora é necessário invalidar a cache privada da CPU1 também, bem como criar uma pilha própria para a CPU1, assim como ativar seu \emph{timer} privado. Através do coprocessador que controla a MMU, é possível de configurar políticas de coerência de memória, como citado na seção \ref{sec:mmu}.
 
-\fig{0.8}{cpu1_init}{Ponto de entrada da CPU 1 durante a inicialização.}
+\fig{0.45}{cpu1_init}{Ponto de entrada da CPU 1 durante a inicialização.}
 
 É necessário também definir um ponto de entrada para o segundo processador.
 Foi escolhido iniciar o segundo processador já desde os primeiros estágios da inicialização do sistema, como é ilustrado na figura \ref{fig:cpu1_init}. Dentro de classes como \verb+Init_System+, onde são inicializado os mediadores do sistema, há desvios de fluxo (\verb=if's=) para inicializar apenas o que for pertinente para cada processador inicializar. Por exemplo, o \emph{timer} pode ser inicializado para cada \emph{core}, já a MMU não precisa ser inicializada duas vezes.

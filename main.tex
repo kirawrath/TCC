@@ -5,6 +5,8 @@
 \usepackage{graphicx} % Possibilita o uso de figuras e gráficos
 \usepackage{color}    % Possibilita o uso de cores no documento
 
+\usepackage[toc,page]{appendix}
+
 \usepackage{color} %syntax highlighting
 \usepackage{listings}
 
@@ -206,7 +208,9 @@ Este trabalho visa descrever e documentar como o sistema operacional EPOS foi po
 %\chapter{Exemplificando um Apêndice}
 %Texto do Apêndice aqui. 
 
-%\anexo
-%\chapter{Exemplificando um Anexo}
-%Texto do anexo aqui.
+\anexo
+\chapter{Artigo}
+\includepdf[pages={1-18}]{artigo.pdf}
+\input{fontes}
+
 \end{document}
